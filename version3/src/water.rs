@@ -152,7 +152,7 @@ pub async fn water_section(day: &Day, water: &WaterDay) -> Result {
                 </li>
             </template>
 
-            water_history(entries: &water.entries, date: day.date, open: false)
+            water_history(entries: &water.entries, date: day.date, open: day.water_open)
         </section>
     }
 }
@@ -216,7 +216,7 @@ async fn log_water(cx: &Cx, Form(input): Form<WaterForm>) -> Result<Response> {
     };
 
     if !hx_request(cx) {
-        return redirect_to_day(cx, date);
+        return redirect_to_day(cx, date, false);
     }
 
     let (count, total) = load_summary(db(cx), user.id, date, &timezone).await?;
@@ -253,7 +253,7 @@ async fn delete_water(cx: &Cx, Form(input): Form<DeleteForm>) -> Result<Response
         .await?;
 
     if !hx_request(cx) {
-        return redirect_to_day(cx, date);
+        return redirect_to_day(cx, date, true);
     }
 
     let water = load(db(cx), user.id, date, &timezone).await?;
@@ -265,13 +265,15 @@ async fn delete_water(cx: &Cx, Form(input): Form<DeleteForm>) -> Result<Response
     fragment.into_response(cx)
 }
 
-fn redirect_to_day(cx: &Cx, date: NaiveDate) -> Result<Response> {
+fn redirect_to_day(cx: &Cx, date: NaiveDate, water_open: bool) -> Result<Response> {
+    let location = if water_open {
+        format!("/?date={date}&water=open")
+    } else {
+        format!("/?date={date}")
+    };
     (
         StatusCode::SEE_OTHER,
-        [(
-            header::LOCATION,
-            HeaderValue::from_str(&format!("/?date={date}"))?,
-        )],
+        [(header::LOCATION, HeaderValue::from_str(&location)?)],
         (),
     )
         .into_response(cx)

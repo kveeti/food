@@ -121,8 +121,10 @@ test("login and water forms work without JavaScript", async ({ browser }, testIn
   await expect(waterTotal(page)).toHaveText("750 ml");
 
   await page.getByText("1 entry", { exact: true }).click();
+  const history = page.locator("#water-history");
   await page.getByRole("button", { name: "Delete 750 ml entry" }).click();
   await expect(waterTotal(page)).toHaveText("0 ml");
+  await expect(history).toHaveAttribute("open", "");
 
   await context.close();
 });

@@ -11,11 +11,13 @@ use topcoat::{
 pub struct Day {
     pub date: NaiveDate,
     pub today: NaiveDate,
+    pub water_open: bool,
 }
 
 #[topcoat::router::query_params(error = bad_request)]
 struct DayQuery {
     date: Option<String>,
+    water: Option<String>,
 }
 
 impl Day {
@@ -33,7 +35,11 @@ impl Day {
             .map_err(|_| bad_request("date must use YYYY-MM-DD"))?
             .unwrap_or(today);
 
-        Ok(Self { date, today })
+        Ok(Self {
+            date,
+            today,
+            water_open: query.water.as_deref() == Some("open"),
+        })
     }
 
     pub fn url(&self) -> String {
