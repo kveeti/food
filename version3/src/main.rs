@@ -1,3 +1,8 @@
+mod auth;
+mod dev_oidc;
+
+use std::time::Duration;
+
 use chrono::{DateTime, Utc};
 use sqlx::{PgPool, types::Uuid};
 
@@ -5,6 +10,7 @@ use topcoat::{
     Result,
     asset::{Asset, AssetBundle, RouterBuilderAssetExt, asset, asset_config},
     context::{Cx, app_context},
+    cookie::RouterBuilderCookieExt,
     font::{Font, RouterBuilderFontExt, font},
     htmx::hx_request,
     router::{
@@ -13,6 +19,7 @@ use topcoat::{
         error::{bad_request, see_other},
         header, layout, page, path_param, route,
     },
+    session::{RouterBuilderSessionExt, SessionConfig},
     tailwind,
     view::view,
 };
@@ -52,19 +59,14 @@ async fn main() {
     let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
     let pool = PgPool::connect(&database_url).await.unwrap();
 
-    sqlx::query(
-        "CREATE TABLE IF NOT EXISTS water_log (
-            id          UUID PRIMARY KEY DEFAULT uuidv7(),
-            amount_ml   INTEGER NOT NULL CHECK (amount_ml > 0),
-            consumed_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-            created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
-        )",
-    )
-    .execute(&pool)
-    .await
-    .unwrap();
+    sqlx::raw_sql(include_str!("../migrations/001_initial.sql"))
+        .execute(&pool)
+        .await
+        .unwrap();
 
-    let router = Router::builder()
+    let auth = auth::Auth::from_env();
+    let dev_provider = (!auth.is_prod).then(|| dev_oidc::DevOidc::new(&auth));
+    let mut builder = Router::builder()
         .layout(root_layout)
         .page(home)
         .route(log_water)
@@ -72,11 +74,22 @@ async fn main() {
         .route(manifest)
         .route(service_worker)
         .font(GEIST)
+        .cookies()
+        .sessions(
+            SessionConfig::builder()
+                .lifetime(Duration::from_secs(7 * 24 * 60 * 60))
+                .build(),
+        )
         .assets(AssetBundle::load().unwrap())
         .app_context(pool)
-        .build();
+        .app_context(auth);
+    builder = auth::register(builder);
 
-    topcoat::start(router).await.unwrap();
+    if let Some(dev_provider) = dev_provider {
+        builder = dev_oidc::register(builder).app_context(dev_provider);
+    }
+
+    topcoat::start(builder.build()).await.unwrap();
 }
 
 #[layout("/")]
@@ -105,7 +118,7 @@ async fn root_layout(slot: Result) -> Result {
 
             <body class="min-h-screen bg-canvas font-sans text-gray-950 antialiased">
                 <nav class="fixed inset-x-0 bottom-0 z-10 h-(--nav-height) bg-nav/80 backdrop-blur-md sm:sticky sm:top-0">
-                    <div class="mx-auto flex h-full w-full max-w-(--page-width) items-stretch px-3 sm:px-6">
+                    <div class="mx-auto flex h-full w-full max-w-(--page-width) items-stretch justify-between px-3 sm:px-6">
                         <a
                             href="/"
                             aria-current="page"
@@ -113,6 +126,11 @@ async fn root_layout(slot: Result) -> Result {
                         >
                             "today"
                         </a>
+                        <form method="post" action="/logout">
+                            <button type="submit" class="inline-flex h-full items-center px-3 text-sm text-gray-700 hover:bg-gray-200/70 sm:text-base">
+                                "log out"
+                            </button>
+                        </form>
                     </div>
                 </nav>
 
@@ -221,7 +239,8 @@ struct WaterLog {
 
 #[page("/")]
 async fn home(cx: &Cx) -> Result {
-    let (entries, total_today) = load_water_log(db(cx)).await?;
+    let user = auth::require_user(cx).await?;
+    let (entries, total_today) = load_water_log(db(cx), user.id).await?;
 
     view! {
         <main class="mx-auto w-full max-w-(--page-width) px-3 pb-[calc(var(--nav-height)+2rem)] pt-6 sm:px-6 sm:pb-12 sm:pt-10">
@@ -312,15 +331,17 @@ async fn water_button(amount_ml: i32) -> Result {
 
 #[route(POST "/water")]
 async fn log_water(cx: &Cx, Form(input): Form<LogWater>) -> Result<Response> {
+    let user = auth::require_user(cx).await?;
     if !(1..=10_000).contains(&input.amount_ml) {
         return Err(bad_request("water must be between 1 and 10000 ml").into());
     }
 
     let (id, amount_ml, consumed_at) = sqlx::query_as(
-        "INSERT INTO water_log (amount_ml)
-         VALUES ($1)
+        "INSERT INTO water_log (user_id, amount_ml)
+         VALUES ($1, $2)
          RETURNING id, amount_ml, consumed_at",
     )
+    .bind(user.id)
     .bind(input.amount_ml)
     .fetch_one(db(cx))
     .await?;
@@ -334,7 +355,7 @@ async fn log_water(cx: &Cx, Form(input): Form<LogWater>) -> Result<Response> {
         return see_other("/").into_response(cx);
     }
 
-    let total_today = load_today_total(db(cx)).await?;
+    let total_today = load_today_total(db(cx), user.id).await?;
     let fragment = view! {
         water_entry(entry: &entry)
         <span id="today-total" hx-swap-oob="true">(total_today)</span>
@@ -349,10 +370,12 @@ struct Id(Uuid);
 
 #[route(POST "/water/{id}/delete")]
 async fn delete_water(cx: &Cx) -> Result<Response> {
+    let user = auth::require_user(cx).await?;
     let id = path_param::<Id>(cx)?;
 
-    sqlx::query("DELETE FROM water_log WHERE id = $1")
+    sqlx::query("DELETE FROM water_log WHERE id = $1 AND user_id = $2")
         .bind(id)
+        .bind(user.id)
         .execute(db(cx))
         .await?;
 
@@ -360,7 +383,7 @@ async fn delete_water(cx: &Cx) -> Result<Response> {
         return see_other("/").into_response(cx);
     }
 
-    let (entries, total_today) = load_water_log(db(cx)).await?;
+    let (entries, total_today) = load_water_log(db(cx), user.id).await?;
     let fragment = view! {
         log_entries_component(entries: &entries)
         <span id="today-total" hx-swap-oob="true">(total_today)</span>
@@ -369,16 +392,18 @@ async fn delete_water(cx: &Cx) -> Result<Response> {
     fragment.into_response(cx)
 }
 
-async fn load_water_log(pool: &PgPool) -> Result<(Vec<WaterLog>, i64)> {
+async fn load_water_log(pool: &PgPool, user_id: Uuid) -> Result<(Vec<WaterLog>, i64)> {
     let (rows, total_today) = tokio::try_join!(
         sqlx::query_as(
             "SELECT id, amount_ml, consumed_at
              FROM water_log
+             WHERE user_id = $1
              ORDER BY consumed_at DESC
              LIMIT 20",
         )
+        .bind(user_id)
         .fetch_all(pool),
-        load_today_total(pool),
+        load_today_total(pool, user_id),
     )?;
     let entries = rows
         .into_iter()
@@ -392,12 +417,14 @@ async fn load_water_log(pool: &PgPool) -> Result<(Vec<WaterLog>, i64)> {
     Ok((entries, total_today))
 }
 
-async fn load_today_total(pool: &PgPool) -> sqlx::Result<i64> {
+async fn load_today_total(pool: &PgPool, user_id: Uuid) -> sqlx::Result<i64> {
     Ok(sqlx::query_scalar(
         "SELECT COALESCE(SUM(amount_ml), 0)
          FROM water_log
-         WHERE consumed_at >= (now() AT TIME ZONE 'UTC')::date",
+         WHERE user_id = $1
+           AND consumed_at >= (now() AT TIME ZONE 'UTC')::date",
     )
+    .bind(user_id)
     .fetch_one(pool)
     .await?)
 }

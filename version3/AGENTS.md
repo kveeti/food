@@ -9,11 +9,15 @@
 - UI follows `../../dash/`: mobile first, Geist, quiet gray UI, bottom nav on phone, top nav on wide screens, system dark mode.
 - Every link and form must work with JS off. htmx only makes it faster. Use JS only when HTML and htmx cannot do the job.
 - Writes should feel instant. Use `hx-optimistic` when rollback is clear.
-- Auth: OIDC code flow with PKCE. Store opaque session token hashes in Postgres. Use HttpOnly, SameSite=Lax cookies. Dev OIDC routes live in this server and must not run in prod.
+- Auth: OIDC code flow with PKCE. Store opaque session token hashes in Postgres. Use HttpOnly, SameSite=Lax cookies.
+- Dev OIDC lives at `/dev/oidc/*` in this server. It has `alice` and `bob`. `IS_PROD=1` removes it.
+- Prod needs `APP_URL`, `OIDC_ISSUER`, `OIDC_CLIENT_ID`, and `OIDC_CLIENT_SECRET`.
 - All user data must have an owner. Never read or write another user's rows.
 - PWA uses Workbox 7.4.1. `/service-worker.js` caches only `/_topcoat/assets/` and `/_topcoat/fonts/`. Pages and writes stay network-only. Offline writes need a clear sync plan before code.
 - No DB call in a loop. Prefer one clear SQL query.
+- Browser tests: `pnpm e2e`. They build once and use a fresh Postgres database on port 8200.
 - Tailwind input is `src/tailwind.css`. `build.rs` scans only `src/` to keep builds quick.
 - Keep Cargo features narrow. Do not use `tokio/full` or Topcoat defaults when a small feature set works.
 - Dependency debug info is off in dev/test profiles to cut build time.
-- Batch edits, then run one check. Rust builds take time. Do not run `cargo check` while `topcoat dev` is building; that does the work twice.
+- Batch edits with `topcoat dev` stopped. Then run one `cargo build` and let it finish before starting `topcoat dev`.
+- Do not use `cargo check` here. It makes a second set of artifacts and fights the full build cache.

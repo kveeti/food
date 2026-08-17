@@ -5,10 +5,16 @@ edition = "2024"
 
 [dependencies]
 tokio = { version = "1.53.1", features = ["macros", "rt-multi-thread"] }
-topcoat = { version = "0.5.0", default-features = false, features = ["asset", "font", "htmx", "router", "serve", "tailwind", "view"] }
+topcoat = { version = "0.5.0", default-features = false, features = ["asset", "cookie", "font", "htmx", "router", "serve", "session", "tailwind", "view"] }
 sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "tls-rustls", "postgres", "uuid", "chrono"] }
+base64 = "0.22"
 chrono = "0.4"
+openidconnect = { version = "4.0.1", default-features = false, features = ["reqwest", "rustls-tls"] }
+rsa = { version = "0.9.8", default-features = false, features = ["getrandom", "sha2", "std", "u64_digit"] }
 serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+url = "2"
 
 [build-dependencies]
 topcoat = { version = "0.5.0", default-features = false, features = ["tailwind"] }
