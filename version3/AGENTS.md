@@ -11,9 +11,9 @@
 - Writes should feel instant. Use `hx-optimistic` when rollback is clear.
 - Auth: OIDC code flow with PKCE. Store opaque session token hashes in Postgres. Use HttpOnly, SameSite=Lax cookies. Dev OIDC routes live in this server and must not run in prod.
 - All user data must have an owner. Never read or write another user's rows.
-- PWA: do not cache private HTML, API replies, or writes. Cache public hashed assets first. Offline writes need a clear sync plan before code.
+- PWA uses Workbox 7.4.1. `/service-worker.js` caches only `/_topcoat/assets/` and `/_topcoat/fonts/`. Pages and writes stay network-only. Offline writes need a clear sync plan before code.
 - No DB call in a loop. Prefer one clear SQL query.
 - Tailwind input is `src/tailwind.css`. `build.rs` scans only `src/` to keep builds quick.
 - Keep Cargo features narrow. Do not use `tokio/full` or Topcoat defaults when a small feature set works.
 - Dependency debug info is off in dev/test profiles to cut build time.
-- Batch edits, then run one check. Rust builds take time. Do not rerun the same build for no reason.
+- Batch edits, then run one check. Rust builds take time. Do not run `cargo check` while `topcoat dev` is building; that does the work twice.
