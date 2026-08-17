@@ -83,42 +83,40 @@ async fn search(pool: &sqlx::PgPool, user_id: Uuid, query: &str) -> Result<Vec<S
     if query.is_empty() {
         return Ok(Vec::new());
     }
-    let pattern = format!("%{}%", query.to_lowercase());
     let prefix = format!("{}%", query.to_lowercase());
+    let prefix_query = prefix_tsquery(query);
+    if prefix_query.is_empty() {
+        return Ok(Vec::new());
+    }
     let rows = sqlx::query_as(
-        "SELECT foods.id, foods.display_name, foods.brand, foods.source,
+        "WITH search AS (
+             SELECT plainto_tsquery('simple', $2)
+                    || plainto_tsquery('finnish', $2)
+                    || plainto_tsquery('swedish', $2)
+                    || plainto_tsquery('english', $2)
+                    || to_tsquery('simple', $4) AS query
+         )
+         SELECT foods.id, foods.display_name, foods.brand, foods.source,
                 energy.value / 4.184
          FROM foods
+         CROSS JOIN search
          LEFT JOIN nutrients energy_name ON energy_name.code = 'energy'
          LEFT JOIN food_nutrients energy
                 ON energy.food_id = foods.id AND energy.nutrient_id = energy_name.id
          WHERE NOT foods.is_archived
            AND (foods.source <> 'custom' OR foods.owner_user_id = $1)
-           AND (
-               lower(foods.display_name) LIKE $2
-               OR EXISTS (
-                   SELECT 1 FROM food_aliases
-                   WHERE food_aliases.food_id = foods.id
-                     AND lower(food_aliases.name) LIKE $2
-               )
-           )
+           AND foods.search_vector @@ search.query
          ORDER BY
-             CASE
-                 WHEN lower(foods.display_name) LIKE $3 THEN 0
-                 WHEN EXISTS (
-                     SELECT 1 FROM food_aliases
-                     WHERE food_aliases.food_id = foods.id
-                       AND lower(food_aliases.name) LIKE $3
-                 ) THEN 1
-                 ELSE 2
-             END,
+             CASE WHEN lower(foods.display_name) LIKE $3 THEN 0 ELSE 1 END,
+             ts_rank_cd(foods.search_vector, search.query) DESC,
              CASE foods.source WHEN 'custom' THEN 0 WHEN 'fineli' THEN 1 ELSE 2 END,
              foods.display_name
          LIMIT 10",
     )
     .bind(user_id)
-    .bind(pattern)
+    .bind(query)
     .bind(prefix)
+    .bind(prefix_query)
     .fetch_all(pool)
     .await?;
 
@@ -132,6 +130,16 @@ async fn search(pool: &sqlx::PgPool, user_id: Uuid, query: &str) -> Result<Vec<S
             energy_kcal,
         })
         .collect())
+}
+
+fn prefix_tsquery(query: &str) -> String {
+    query
+        .to_lowercase()
+        .split(|character: char| !character.is_alphanumeric())
+        .filter(|part| !part.is_empty())
+        .map(|part| format!("{part}:*"))
+        .collect::<Vec<_>>()
+        .join(" & ")
 }
 
 async fn load_preview(

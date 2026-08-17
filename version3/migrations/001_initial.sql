@@ -57,6 +57,7 @@ CREATE TABLE IF NOT EXISTS foods (
     brand          TEXT,
     basis_unit     TEXT NOT NULL CHECK (basis_unit IN ('g', 'ml', 'count')),
     source_data    JSONB NOT NULL DEFAULT '{}'::jsonb,
+    search_vector  TSVECTOR NOT NULL DEFAULT ''::tsvector,
     is_archived    BOOLEAN NOT NULL DEFAULT false,
     created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -72,6 +73,19 @@ CREATE UNIQUE INDEX IF NOT EXISTS foods_source_id_idx
 CREATE INDEX IF NOT EXISTS foods_owner_idx ON foods(owner_user_id)
     WHERE owner_user_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS foods_display_name_idx ON foods(lower(display_name));
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = current_schema()
+          AND table_name = 'foods'
+          AND column_name = 'search_vector'
+    ) THEN
+        ALTER TABLE foods ADD COLUMN search_vector TSVECTOR NOT NULL DEFAULT ''::tsvector;
+    END IF;
+END;
+$$;
+CREATE INDEX IF NOT EXISTS foods_search_vector_idx ON foods USING GIN(search_vector);
 
 CREATE TABLE IF NOT EXISTS food_aliases (
     id         UUID PRIMARY KEY DEFAULT uuidv7(),
@@ -83,6 +97,77 @@ CREATE TABLE IF NOT EXISTS food_aliases (
 CREATE UNIQUE INDEX IF NOT EXISTS food_aliases_unique_idx
     ON food_aliases(food_id, lower(name), COALESCE(locale, ''));
 CREATE INDEX IF NOT EXISTS food_aliases_name_idx ON food_aliases(lower(name));
+
+CREATE OR REPLACE FUNCTION refresh_food_search_vector(target_food_id UUID)
+RETURNS VOID
+LANGUAGE SQL
+AS $$
+    UPDATE foods
+    SET search_vector =
+        setweight(to_tsvector('simple', concat_ws(' ', display_name, brand)), 'A')
+        || setweight(to_tsvector('simple', COALESCE((
+            SELECT string_agg(name, ' ') FROM food_aliases WHERE food_id = target_food_id
+        ), '')), 'B')
+        || setweight(to_tsvector('finnish', COALESCE((
+            SELECT string_agg(name, ' ') FROM food_aliases
+            WHERE food_id = target_food_id AND locale = 'fi'
+        ), '')), 'B')
+        || setweight(to_tsvector('swedish', COALESCE((
+            SELECT string_agg(name, ' ') FROM food_aliases
+            WHERE food_id = target_food_id AND locale = 'sv'
+        ), '')), 'B')
+        || setweight(to_tsvector('english', COALESCE((
+            SELECT string_agg(name, ' ') FROM food_aliases
+            WHERE food_id = target_food_id AND locale = 'en'
+        ), '')), 'B')
+    WHERE id = target_food_id;
+$$;
+
+CREATE OR REPLACE FUNCTION refresh_food_search_from_food()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    PERFORM refresh_food_search_vector(NEW.id);
+    RETURN NEW;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION refresh_food_search_from_alias()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    IF TG_OP = 'DELETE' THEN
+        PERFORM refresh_food_search_vector(OLD.food_id);
+        RETURN OLD;
+    END IF;
+    IF TG_OP = 'UPDATE' AND OLD.food_id <> NEW.food_id THEN
+        PERFORM refresh_food_search_vector(OLD.food_id);
+    END IF;
+    PERFORM refresh_food_search_vector(NEW.food_id);
+    RETURN NEW;
+END;
+$$;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'foods_search_vector_trigger') THEN
+        CREATE TRIGGER foods_search_vector_trigger
+        AFTER INSERT OR UPDATE OF display_name, brand ON foods
+        FOR EACH ROW EXECUTE FUNCTION refresh_food_search_from_food();
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'food_aliases_search_vector_trigger') THEN
+        CREATE TRIGGER food_aliases_search_vector_trigger
+        AFTER INSERT OR UPDATE OR DELETE ON food_aliases
+        FOR EACH ROW EXECUTE FUNCTION refresh_food_search_from_alias();
+    END IF;
+END;
+$$;
+
+SELECT refresh_food_search_vector(id)
+FROM foods
+WHERE search_vector = ''::tsvector;
 
 CREATE TABLE IF NOT EXISTS food_nutrients (
     food_id      UUID NOT NULL REFERENCES foods(id) ON DELETE CASCADE,

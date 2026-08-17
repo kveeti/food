@@ -53,9 +53,12 @@ pub fn read_fineli(directory: &Path) -> Result<FoodImport, Box<dyn Error>> {
     let mut foods = BTreeMap::new();
     for row in &food_rows.rows {
         let source_id = field(&food_rows.headers, row, "FOODID")?.to_owned();
-        let display_name = field(&food_rows.headers, row, "FOODNAME")?.to_owned();
+        let source_name = field(&food_rows.headers, row, "FOODNAME")?;
+        let display_name = normalize_name(source_name);
         let source_data = json!({
             "release": "20.0",
+            "display_name": source_name,
+            "names": Map::<String, Value>::new(),
             "food_type": field(&food_rows.headers, row, "FOODTYPE")?,
             "process": field(&food_rows.headers, row, "PROCESS")?,
             "edible_portion_percent": field(&food_rows.headers, row, "EDPORT")?,
@@ -87,16 +90,23 @@ pub fn read_fineli(directory: &Path) -> Result<FoodImport, Box<dyn Error>> {
         let names = read_latin_csv(directory.join(filename))?;
         for row in &names.rows {
             let source_id = field(&names.headers, row, "FOODID")?;
-            let name = field(&names.headers, row, "FOODNAME")?.trim();
+            let source_name = field(&names.headers, row, "FOODNAME")?.trim();
             if let Some(food) = foods.get_mut(source_id)
-                && !name.is_empty()
+                && !source_name.is_empty()
             {
+                let names = food
+                    .source_data
+                    .get_mut("names")
+                    .and_then(Value::as_object_mut)
+                    .expect("Fineli source data names must be an object");
+                names.insert(locale.to_owned(), Value::String(source_name.to_owned()));
+                let name = normalize_name(source_name);
                 food.aliases.push(Alias {
-                    name: name.to_owned(),
+                    name: name.clone(),
                     locale: locale.to_owned(),
                 });
                 if locale == "fi" {
-                    food.display_name = name.to_owned();
+                    food.display_name = name;
                 }
             }
         }
@@ -190,6 +200,51 @@ fn field<'a>(
         .ok_or_else(|| data_error(format!("missing column {name}")))?;
     row.get(index)
         .ok_or_else(|| data_error(format!("missing value for column {name}")))
+}
+
+fn normalize_name(source: &str) -> String {
+    let mut normalized = String::new();
+    let mut token = String::new();
+    let flush_token = |normalized: &mut String, token: &mut String| {
+        if token.is_empty() {
+            return;
+        }
+        match token.as_str() {
+            "uht" => normalized.push_str("UHT"),
+            "htst" => normalized.push_str("HTST"),
+            "epa" => normalized.push_str("EPA"),
+            "dha" => normalized.push_str("DHA"),
+            "gmo" => normalized.push_str("GMO"),
+            "a-vitamiini" => normalized.push_str("A-vitamiini"),
+            "b12-vitamiini" => normalized.push_str("B12-vitamiini"),
+            "d-vitamiini" => normalized.push_str("D-vitamiini"),
+            "d2-vitamiini" => normalized.push_str("D2-vitamiini"),
+            "d3-vitamiini" => normalized.push_str("D3-vitamiini"),
+            "e-vitamiini" => normalized.push_str("E-vitamiini"),
+            _ => normalized.push_str(token),
+        }
+        token.clear();
+    };
+
+    for character in source.trim().to_lowercase().chars() {
+        if character.is_alphanumeric() || character == '-' {
+            token.push(character);
+        } else {
+            flush_token(&mut normalized, &mut token);
+            normalized.push(character);
+        }
+    }
+    flush_token(&mut normalized, &mut token);
+
+    if let Some((index, character)) = normalized
+        .char_indices()
+        .find(|(_, character)| character.is_alphabetic())
+        && character.is_lowercase()
+    {
+        let uppercase = character.to_uppercase().collect::<String>();
+        normalized.replace_range(index..index + character.len_utf8(), &uppercase);
+    }
+    normalized
 }
 
 fn parse_decimal(value: &str) -> Result<f64, io::Error> {
@@ -295,5 +350,14 @@ mod tests {
     #[test]
     fn parses_decimal_commas() {
         assert_eq!(parse_decimal("12,340").unwrap(), 12.34);
+    }
+
+    #[test]
+    fn normalizes_fineli_names_without_losing_known_abbreviations() {
+        assert_eq!(normalize_name("MAITO, RASVATON"), "Maito, rasvaton");
+        assert_eq!(
+            normalize_name("MAITO, UHT, D-VITAMIINI"),
+            "Maito, UHT, D-vitamiini"
+        );
     }
 }

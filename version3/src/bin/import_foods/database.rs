@@ -10,6 +10,12 @@ pub async fn write_import(
 ) -> Result<(), Box<dyn Error>> {
     let mut transaction = connection.begin().await?;
     let source = import.source;
+    sqlx::raw_sql(
+        "ALTER TABLE foods DISABLE TRIGGER foods_search_vector_trigger;
+         ALTER TABLE food_aliases DISABLE TRIGGER food_aliases_search_vector_trigger;",
+    )
+    .execute(&mut *transaction)
+    .await?;
 
     let definitions = import.nutrients.values().collect::<Vec<_>>();
     let codes = definitions
@@ -192,6 +198,21 @@ pub async fn write_import(
     .bind(&value_source_ids)
     .bind(&value_codes)
     .bind(&values)
+    .execute(&mut *transaction)
+    .await?;
+
+    sqlx::raw_sql(
+        "ALTER TABLE foods ENABLE TRIGGER foods_search_vector_trigger;
+         ALTER TABLE food_aliases ENABLE TRIGGER food_aliases_search_vector_trigger;",
+    )
+    .execute(&mut *transaction)
+    .await?;
+    sqlx::query(
+        "SELECT refresh_food_search_vector(id)
+         FROM foods
+         WHERE source = $1 AND NOT is_archived",
+    )
+    .bind(source)
     .execute(&mut *transaction)
     .await?;
 

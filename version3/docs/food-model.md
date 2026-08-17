@@ -23,7 +23,10 @@ Foods are archived instead of deleted. This keeps favourites, shortcuts, and
 old diary references valid.
 
 `food_aliases` stores translated and alternate search names. `display_name`
-stays on `foods` so normal rendering needs no alias join.
+stays on `foods` so normal rendering needs no alias join. PostgreSQL maintains a
+weighted `tsvector` from the name, brand, and aliases with Finnish, Swedish,
+English, and simple dictionaries. Search uses its GIN index, language stemming,
+and token-prefix queries for typeahead.
 
 ## Nutrients
 
@@ -72,7 +75,9 @@ Changing an imported or custom food never rewrites old entries.
 ## Source rules
 
 Fineli is imported as a complete public catalog with Finnish display names and
-Finnish, Swedish, English, and scientific aliases. Its values are per 100 g.
+Finnish, Swedish, English, and scientific aliases. Imported all-uppercase names
+are stored in sentence case while their exact source text remains in
+`source_data`. Its values are per 100 g.
 
 Open Food Facts is imported only for products tagged `en:finland` that have a
 barcode, a product name, and at least one supported numeric nutrient. The TSV
