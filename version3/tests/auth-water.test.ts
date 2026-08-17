@@ -38,7 +38,12 @@ test("settings stores a timezone and days can move backward and forward", async 
 }, testInfo) => {
   await login(page, testInfo);
 
+  const settingsRequestPromise = page.waitForRequest(
+    (request) => new URL(request.url()).pathname === "/settings",
+  );
   await page.getByRole("link", { name: "settings" }).click();
+  const settingsRequest = await settingsRequestPromise;
+  expect(settingsRequest.headers()["hx-request"]).toBe("true");
   await page
     .getByRole("combobox", { name: "Timezone" })
     .selectOption("America/New_York");
@@ -54,10 +59,15 @@ test("settings stores a timezone and days can move backward and forward", async 
     "href",
     "/?date=2035-01-14",
   );
-  await expect(page.getByRole("link", { name: "Next day" })).toHaveAttribute(
-    "href",
-    "/?date=2035-01-16",
+  const next = page.getByRole("link", { name: "Next day" });
+  await expect(next).toHaveAttribute("href", "/?date=2035-01-16");
+  const nextRequestPromise = page.waitForRequest(
+    (request) => new URL(request.url()).searchParams.get("date") === "2035-01-16",
   );
+  await next.click();
+  const nextRequest = await nextRequestPromise;
+  expect(nextRequest.headers()["hx-request"]).toBe("true");
+  await expect(page).toHaveURL("/?date=2035-01-16");
 
   await page.getByRole("button", { name: "250 ml" }).click();
   await expect(waterTotal(page)).toHaveText("250 ml");

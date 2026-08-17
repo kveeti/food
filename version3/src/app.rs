@@ -61,12 +61,14 @@ async fn root_layout(slot: Result) -> Result {
                         <div class="flex h-full items-stretch">
                             <a
                                 href="/"
+                                hx-boost="true"
                                 class="inline-flex h-full items-center px-3 text-sm text-gray-950 hover:bg-gray-200/70 sm:text-base"
                             >
                                 "today"
                             </a>
                             <a
                                 href="/settings"
+                                hx-boost="true"
                                 class="inline-flex h-full items-center px-3 text-sm text-gray-700 hover:bg-gray-200/70 sm:text-base"
                             >
                                 "settings"

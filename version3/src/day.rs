@@ -76,6 +76,7 @@ pub async fn day_navigation(day: &Day) -> Result {
             <a
                 href=(previous)
                 aria-label="Previous day"
+                hx-boost="true"
                 class="grid size-11 place-items-center rounded-lg text-gray-700 hover:bg-gray-100 focus-visible:outline-2 focus-visible:outline-gray-500"
             >
                 <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" class="size-5">
@@ -89,6 +90,7 @@ pub async fn day_navigation(day: &Day) -> Result {
             <a
                 href=(next)
                 aria-label="Next day"
+                hx-boost="true"
                 class="grid size-11 place-items-center rounded-lg text-gray-700 hover:bg-gray-100 focus-visible:outline-2 focus-visible:outline-gray-500"
             >
                 <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" class="size-5">
