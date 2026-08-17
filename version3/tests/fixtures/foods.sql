@@ -10,7 +10,9 @@ VALUES
 INSERT INTO foods (source, source_id, display_name, basis_unit, source_data)
 VALUES
     ('fineli', '1', 'SOKERI', 'g', '{"fixture": true}'),
-    ('fineli', '2', 'Persikka/nektariini, keskiarvo, punnittu kivineen', 'g', '{"fixture": true}');
+    ('fineli', '2', 'Persikka/nektariini, keskiarvo, punnittu kivineen', 'g', '{"fixture": true}'),
+    ('fineli', '3', 'Maito, rasvaton, d-vitamiinia 1 ug', 'g', '{"fixture": true}'),
+    ('fineli', '4', 'Kalakastike, kalamuhennos, maitopohjainen, rasvaton maito', 'g', '{"fixture": true}');
 
 INSERT INTO food_aliases (food_id, name, locale)
 SELECT id, 'SUGAR', 'en' FROM foods WHERE source = 'fineli' AND source_id = '1';
@@ -38,3 +40,10 @@ SELECT foods.id, nutrients.id, 184::double precision
 FROM foods
 JOIN nutrients ON nutrients.code = 'energy'
 WHERE foods.source = 'fineli' AND foods.source_id = '2';
+
+INSERT INTO food_nutrients (food_id, nutrient_id, value)
+SELECT foods.id, nutrients.id,
+       CASE foods.source_id WHEN '3' THEN 115::double precision ELSE 527::double precision END
+FROM foods
+JOIN nutrients ON nutrients.code = 'energy'
+WHERE foods.source = 'fineli' AND foods.source_id IN ('3', '4');

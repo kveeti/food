@@ -83,40 +83,59 @@ async fn search(pool: &sqlx::PgPool, user_id: Uuid, query: &str) -> Result<Vec<S
     if query.is_empty() {
         return Ok(Vec::new());
     }
-    let prefix = format!("{}%", query.to_lowercase());
+    let normalized_query = normalize_search_text(query);
     let prefix_query = prefix_tsquery(query);
     if prefix_query.is_empty() {
         return Ok(Vec::new());
     }
+    let title_prefix = format!("{normalized_query}%");
+    let title_contains = format!("%{normalized_query}%");
     let rows = sqlx::query_as(
         "WITH search AS (
              SELECT plainto_tsquery('simple', $2)
                     || plainto_tsquery('finnish', $2)
                     || plainto_tsquery('swedish', $2)
                     || plainto_tsquery('english', $2)
-                    || to_tsquery('simple', $4) AS query
+                    || to_tsquery('simple', $3) AS query
+         ), matches AS (
+             SELECT foods.id, foods.display_name, foods.brand, foods.source,
+                    energy.value / 4.184 AS energy_kcal,
+                    foods.search_vector,
+                    search.query,
+                    regexp_replace(lower(foods.display_name), '[^[:alnum:]]+', ' ', 'g') AS normalized_name,
+                    regexp_replace(lower(foods.display_name), '[^[:alnum:]/]+', ' ', 'g') AS slash_name
+             FROM foods
+             CROSS JOIN search
+             LEFT JOIN nutrients energy_name ON energy_name.code = 'energy'
+             LEFT JOIN food_nutrients energy
+                    ON energy.food_id = foods.id AND energy.nutrient_id = energy_name.id
+             WHERE NOT foods.is_archived
+               AND (foods.source <> 'custom' OR foods.owner_user_id = $1)
+               AND foods.search_vector @@ search.query
          )
-         SELECT foods.id, foods.display_name, foods.brand, foods.source,
-                energy.value / 4.184
-         FROM foods
-         CROSS JOIN search
-         LEFT JOIN nutrients energy_name ON energy_name.code = 'energy'
-         LEFT JOIN food_nutrients energy
-                ON energy.food_id = foods.id AND energy.nutrient_id = energy_name.id
-         WHERE NOT foods.is_archived
-           AND (foods.source <> 'custom' OR foods.owner_user_id = $1)
-           AND foods.search_vector @@ search.query
+         SELECT id, display_name, brand, source, energy_kcal
+         FROM matches
          ORDER BY
-             CASE WHEN lower(foods.display_name) LIKE $3 THEN 0 ELSE 1 END,
-             ts_rank_cd(foods.search_vector, search.query) DESC,
-             CASE foods.source WHEN 'custom' THEN 0 WHEN 'fineli' THEN 1 ELSE 2 END,
-             foods.display_name
+             CASE
+                 WHEN normalized_name LIKE $4 THEN 0
+                 WHEN slash_name LIKE ('%/' || $4) THEN 1
+                 WHEN normalized_name LIKE $5 THEN 2
+                 ELSE 3
+             END,
+             CASE
+                 WHEN normalized_name LIKE $4 OR slash_name LIKE ('%/' || $4)
+                 THEN char_length(display_name)
+             END,
+             ts_rank_cd(search_vector, query) DESC,
+             CASE source WHEN 'custom' THEN 0 WHEN 'fineli' THEN 1 ELSE 2 END,
+             display_name
          LIMIT 10",
     )
     .bind(user_id)
     .bind(query)
-    .bind(prefix)
     .bind(prefix_query)
+    .bind(title_prefix)
+    .bind(title_contains)
     .fetch_all(pool)
     .await?;
 
@@ -132,12 +151,22 @@ async fn search(pool: &sqlx::PgPool, user_id: Uuid, query: &str) -> Result<Vec<S
         .collect())
 }
 
-fn prefix_tsquery(query: &str) -> String {
+fn search_terms(query: &str) -> impl Iterator<Item = &str> {
     query
-        .to_lowercase()
         .split(|character: char| !character.is_alphanumeric())
         .filter(|part| !part.is_empty())
-        .map(|part| format!("{part}:*"))
+}
+
+fn normalize_search_text(query: &str) -> String {
+    search_terms(query)
+        .map(str::to_lowercase)
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+fn prefix_tsquery(query: &str) -> String {
+    search_terms(query)
+        .map(|part| format!("{}:*", part.to_lowercase()))
         .collect::<Vec<_>>()
         .join(" & ")
 }

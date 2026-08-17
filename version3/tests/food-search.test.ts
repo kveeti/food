@@ -20,6 +20,11 @@ test("food search previews scaled nutrients without saving", async ({ page }, te
   await expect(
     page.getByRole("link", { name: /Persikka\/nektariini/ }),
   ).toBeVisible();
+
+  await page.getByRole("searchbox", { name: "Search foods" }).fill("maito rasvaton");
+  await expect(page.locator("#food-results a").first()).toContainText(
+    "Maito, rasvaton",
+  );
 });
 
 test("food search and preview work without JavaScript", async ({ browser }, testInfo) => {
