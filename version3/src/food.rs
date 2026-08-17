@@ -89,7 +89,9 @@ async fn search(pool: &sqlx::PgPool, user_id: Uuid, query: &str) -> Result<Vec<S
         return Ok(Vec::new());
     }
     let title_prefix = format!("{normalized_query}%");
-    let title_contains = format!("%{normalized_query}%");
+    let query_terms = search_terms(query)
+        .map(str::to_lowercase)
+        .collect::<Vec<_>>();
     let rows = sqlx::query_as(
         "WITH search AS (
              SELECT plainto_tsquery('simple', $2)
@@ -97,7 +99,7 @@ async fn search(pool: &sqlx::PgPool, user_id: Uuid, query: &str) -> Result<Vec<S
                     || plainto_tsquery('swedish', $2)
                     || plainto_tsquery('english', $2)
                     || to_tsquery('simple', $3) AS query
-         ), matches AS (
+         ), candidates AS (
              SELECT foods.id, foods.display_name, foods.brand, foods.source,
                     energy.value / 4.184 AS energy_kcal,
                     foods.search_vector,
@@ -112,20 +114,31 @@ async fn search(pool: &sqlx::PgPool, user_id: Uuid, query: &str) -> Result<Vec<S
              WHERE NOT foods.is_archived
                AND (foods.source <> 'custom' OR foods.owner_user_id = $1)
                AND foods.search_vector @@ search.query
+         ), matches AS (
+             SELECT candidates.*,
+                    COALESCE((
+                        SELECT max(term_match.position)
+                        FROM unnest($4::text[]) AS query_terms(term)
+                        CROSS JOIN LATERAL (
+                            SELECT min(name_word.position)::integer AS position
+                            FROM unnest(regexp_split_to_array(normalized_name, ' '))
+                                 WITH ORDINALITY AS name_word(word, position)
+                            WHERE name_word.word LIKE (query_terms.term || '%')
+                        ) AS term_match
+                        HAVING count(term_match.position) = cardinality($4::text[])
+                    ), 32767) AS title_distance
+             FROM candidates
          )
          SELECT id, display_name, brand, source, energy_kcal
          FROM matches
          ORDER BY
              CASE
-                 WHEN normalized_name LIKE $4 THEN 0
-                 WHEN slash_name LIKE ('%/' || $4) THEN 1
-                 WHEN normalized_name LIKE $5 THEN 2
-                 ELSE 3
+                 WHEN normalized_name LIKE $5 THEN 0
+                 WHEN slash_name LIKE ('%/' || $5) THEN 1
+                 ELSE 2
              END,
-             CASE
-                 WHEN normalized_name LIKE $4 OR slash_name LIKE ('%/' || $4)
-                 THEN char_length(display_name)
-             END,
+             title_distance,
+             char_length(display_name),
              ts_rank_cd(search_vector, query) DESC,
              CASE source WHEN 'custom' THEN 0 WHEN 'fineli' THEN 1 ELSE 2 END,
              display_name
@@ -134,8 +147,8 @@ async fn search(pool: &sqlx::PgPool, user_id: Uuid, query: &str) -> Result<Vec<S
     .bind(user_id)
     .bind(query)
     .bind(prefix_query)
+    .bind(query_terms)
     .bind(title_prefix)
-    .bind(title_contains)
     .fetch_all(pool)
     .await?;
 

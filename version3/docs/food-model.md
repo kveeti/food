@@ -26,8 +26,9 @@ old diary references valid.
 stays on `foods` so normal rendering needs no alias join. PostgreSQL maintains a
 weighted `tsvector` from the name, brand, and aliases with Finnish, Swedish,
 English, and simple dictionaries. Search uses its GIN index, language stemming,
-and token-prefix queries for typeahead. Names that start with the normalized
-query rank first; slash-separated alternate names rank next.
+and token-prefix queries for typeahead. Exact title prefixes rank first,
+slash-separated alternate names rank next, then names with all query terms near
+the start. Query term order does not hide a direct food-name match.
 
 ## Nutrients
 
