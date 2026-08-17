@@ -8,10 +8,15 @@ VALUES
     ('protein', 'Protein', 'g', 'macro', 40);
 
 INSERT INTO foods (source, source_id, display_name, basis_unit, source_data)
-VALUES ('fineli', '1', 'SOKERI', 'g', '{"fixture": true}');
+VALUES
+    ('fineli', '1', 'SOKERI', 'g', '{"fixture": true}'),
+    ('fineli', '2', 'Persikka/nektariini, keskiarvo, punnittu kivineen', 'g', '{"fixture": true}');
 
 INSERT INTO food_aliases (food_id, name, locale)
 SELECT id, 'SUGAR', 'en' FROM foods WHERE source = 'fineli' AND source_id = '1';
+INSERT INTO food_aliases (food_id, name, locale)
+SELECT id, 'PEACH/NECTARINE, AVERAGE, WEIGHED WITH STONE', 'en'
+FROM foods WHERE source = 'fineli' AND source_id = '2';
 
 INSERT INTO food_nutrients (food_id, nutrient_id, value)
 SELECT foods.id, nutrients.id, values.value
@@ -27,3 +32,9 @@ CROSS JOIN (
 ) AS values(code, value)
 JOIN nutrients ON nutrients.code = values.code
 WHERE foods.source = 'fineli' AND foods.source_id = '1';
+
+INSERT INTO food_nutrients (food_id, nutrient_id, value)
+SELECT foods.id, nutrients.id, 184::double precision
+FROM foods
+JOIN nutrients ON nutrients.code = 'energy'
+WHERE foods.source = 'fineli' AND foods.source_id = '2';

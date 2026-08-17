@@ -15,6 +15,11 @@ test("food search previews scaled nutrients without saving", async ({ page }, te
   await page.getByRole("spinbutton", { name: "Amount in grams" }).fill("50");
   await expect(page.getByText("203 kcal", { exact: true })).toBeVisible();
   await expect(page.getByText("Preview only — nothing will be saved.")).toBeVisible();
+
+  await page.getByRole("searchbox", { name: "Search foods" }).fill("nekta");
+  await expect(
+    page.getByRole("link", { name: /Persikka\/nektariini/ }),
+  ).toBeVisible();
 });
 
 test("food search and preview work without JavaScript", async ({ browser }, testInfo) => {

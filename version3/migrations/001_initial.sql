@@ -58,6 +58,7 @@ CREATE TABLE IF NOT EXISTS foods (
     basis_unit     TEXT NOT NULL CHECK (basis_unit IN ('g', 'ml', 'count')),
     source_data    JSONB NOT NULL DEFAULT '{}'::jsonb,
     search_vector  TSVECTOR NOT NULL DEFAULT ''::tsvector,
+    search_version SMALLINT NOT NULL DEFAULT 1,
     is_archived    BOOLEAN NOT NULL DEFAULT false,
     created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -85,6 +86,18 @@ BEGIN
     END IF;
 END;
 $$;
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = current_schema()
+          AND table_name = 'foods'
+          AND column_name = 'search_version'
+    ) THEN
+        ALTER TABLE foods ADD COLUMN search_version SMALLINT NOT NULL DEFAULT 0;
+    END IF;
+END;
+$$;
 CREATE INDEX IF NOT EXISTS foods_search_vector_idx ON foods USING GIN(search_vector);
 
 CREATE TABLE IF NOT EXISTS food_aliases (
@@ -104,22 +117,24 @@ LANGUAGE SQL
 AS $$
     UPDATE foods
     SET search_vector =
-        setweight(to_tsvector('simple', concat_ws(' ', display_name, brand)), 'A')
+        setweight(to_tsvector('simple', replace(concat_ws(' ', display_name, brand), '/', ' ')), 'A')
         || setweight(to_tsvector('simple', COALESCE((
-            SELECT string_agg(name, ' ') FROM food_aliases WHERE food_id = target_food_id
+            SELECT string_agg(replace(name, '/', ' '), ' ')
+            FROM food_aliases WHERE food_id = target_food_id
         ), '')), 'B')
         || setweight(to_tsvector('finnish', COALESCE((
-            SELECT string_agg(name, ' ') FROM food_aliases
+            SELECT string_agg(replace(name, '/', ' '), ' ') FROM food_aliases
             WHERE food_id = target_food_id AND locale = 'fi'
         ), '')), 'B')
         || setweight(to_tsvector('swedish', COALESCE((
-            SELECT string_agg(name, ' ') FROM food_aliases
+            SELECT string_agg(replace(name, '/', ' '), ' ') FROM food_aliases
             WHERE food_id = target_food_id AND locale = 'sv'
         ), '')), 'B')
         || setweight(to_tsvector('english', COALESCE((
-            SELECT string_agg(name, ' ') FROM food_aliases
+            SELECT string_agg(replace(name, '/', ' '), ' ') FROM food_aliases
             WHERE food_id = target_food_id AND locale = 'en'
-        ), '')), 'B')
+        ), '')), 'B'),
+        search_version = 1
     WHERE id = target_food_id;
 $$;
 
@@ -167,7 +182,7 @@ $$;
 
 SELECT refresh_food_search_vector(id)
 FROM foods
-WHERE search_vector = ''::tsvector;
+WHERE search_version < 1;
 
 CREATE TABLE IF NOT EXISTS food_nutrients (
     food_id      UUID NOT NULL REFERENCES foods(id) ON DELETE CASCADE,
