@@ -7,6 +7,8 @@ CREATE TABLE IF NOT EXISTS users (
     UNIQUE (issuer, subject)
 );
 
+ALTER TABLE users ADD COLUMN IF NOT EXISTS timezone TEXT;
+
 CREATE TABLE IF NOT EXISTS sessions (
     token_hash BYTEA PRIMARY KEY,
     user_id    UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,

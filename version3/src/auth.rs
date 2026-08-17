@@ -316,6 +316,7 @@ pub async fn logout(cx: &Cx) -> Result<Response> {
 #[derive(Debug)]
 pub struct User {
     pub id: Uuid,
+    pub timezone: Option<String>,
 }
 
 async fn current_user(cx: &Cx) -> Result<Option<User>> {
@@ -323,8 +324,8 @@ async fn current_user(cx: &Cx) -> Result<Option<User>> {
         return Ok(None);
     };
 
-    let id = sqlx::query_scalar(
-        "SELECT users.id
+    let user = sqlx::query_as(
+        "SELECT users.id, users.timezone
          FROM sessions
          JOIN users ON users.id = sessions.user_id
          WHERE sessions.token_hash = $1
@@ -334,7 +335,7 @@ async fn current_user(cx: &Cx) -> Result<Option<User>> {
     .fetch_optional(db(cx))
     .await?;
 
-    Ok(id.map(|id| User { id }))
+    Ok(user.map(|(id, timezone)| User { id, timezone }))
 }
 
 pub async fn require_user(cx: &Cx) -> Result<User> {

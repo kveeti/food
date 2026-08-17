@@ -14,6 +14,7 @@
 - Prod needs `APP_URL`, `OIDC_ISSUER`, `OIDC_CLIENT_ID`, and `OIDC_CLIENT_SECRET`.
 - All user data must have an owner. Never read or write another user's rows.
 - PWA uses Workbox 7.4.1. `/service-worker.js` caches only `/_topcoat/assets/` and `/_topcoat/fonts/`. Pages and writes stay network-only. Offline writes need a clear sync plan before code.
+- Keep `main.rs` for startup and route wiring. Put each feature in its own module.
 - No DB call in a loop. Prefer one clear SQL query.
 - Browser tests: `pnpm e2e`. They build once and use a fresh Postgres database on port 8200.
 - Tailwind input is `src/tailwind.css`. `build.rs` scans only `src/` to keep builds quick.
