@@ -1,0 +1,26 @@
+[package]
+name = "version3"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+tokio = { version = "1.53.1", features = ["macros", "rt-multi-thread"] }
+topcoat = { version = "0.5.0", default-features = false, features = ["asset", "font", "htmx", "router", "serve", "tailwind", "view"] }
+sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "tls-rustls", "postgres", "uuid", "chrono"] }
+chrono = "0.4"
+serde = { version = "1", features = ["derive"] }
+
+[build-dependencies]
+topcoat = { version = "0.5.0", default-features = false, features = ["tailwind"] }
+
+[profile.dev]
+debug = true
+
+[profile.dev.package."*"]
+debug = false
+
+[profile.test]
+debug = 1
+
+[profile.test.package."*"]
+debug = false
