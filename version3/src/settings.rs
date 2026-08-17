@@ -112,7 +112,7 @@ async fn settings(cx: &Cx) -> Result {
                             aria-controls="timezone-results"
                             aria-describedby="device-timezone-hint"
                             hx-get="/settings/timezones"
-                            hx-trigger="input changed delay:250ms, search"
+                            hx-trigger="input changed delay:100ms, search"
                             hx-target="#timezone-results"
                             hx-swap="innerHTML"
                             hx-sync="closest form:replace"
