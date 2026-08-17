@@ -10,7 +10,7 @@
 - Every link and form must work with JS off. htmx only makes it faster. Use JS only when HTML and htmx cannot do the job.
 - Writes should feel instant. Use `hx-optimistic` when rollback is clear.
 - Auth: OIDC code flow with PKCE. Store opaque session token hashes in Postgres. Use HttpOnly, SameSite=Lax cookies.
-- Dev OIDC lives at `/dev/oidc/*` in this server. It has `alice` and `bob`. `IS_PROD=1` removes it.
+- Dev OIDC lives at `/dev/oidc/*` in this server. It has `alice` and `bob`. `IS_PROD=1` removes it. Dev `APP_URL` defaults to `http://localhost:$PORT`.
 - Prod needs `APP_URL`, `OIDC_ISSUER`, `OIDC_CLIENT_ID`, and `OIDC_CLIENT_SECRET`.
 - All user data must have an owner. Never read or write another user's rows.
 - PWA uses Workbox 7.4.1. `/service-worker.js` caches only `/_topcoat/assets/` and `/_topcoat/fonts/`. Pages and writes stay network-only. Offline writes need a clear sync plan before code.

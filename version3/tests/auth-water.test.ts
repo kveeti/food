@@ -2,6 +2,17 @@ import { expect, test } from "@playwright/test";
 
 import { login } from "./helpers";
 
+test("dev login moves to the configured host before setting cookies", async ({ page }) => {
+  await page.goto("http://localhost:8200/");
+  await expect(
+    page.getByRole("heading", { name: "Pick a dev user" }),
+  ).toBeVisible();
+  await expect(page).toHaveURL(/^http:\/\/127\.0\.0\.1:8200\/dev\/oidc\/authorize/);
+
+  await page.getByRole("link", { name: /alice@dev\.local/ }).click();
+  await expect(page).toHaveURL("http://127.0.0.1:8200/");
+});
+
 test("OIDC login creates a session and logout ends it", async ({
   page,
 }, testInfo) => {

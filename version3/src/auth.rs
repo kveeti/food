@@ -20,10 +20,11 @@ use topcoat::{
     router::{
         HeaderValue, IntoResponse, Response, RouterBuilder, StatusCode,
         error::{RouterErrorExt, bad_request, see_other, unauthorized},
-        header, query_params, route,
+        header, headers, query_params, route,
     },
     session,
 };
+use url::Url;
 
 const FLOW_COOKIE: &str = "oidc_flow";
 
@@ -51,7 +52,7 @@ impl Auth {
         let is_prod = env::var("IS_PROD").as_deref() == Ok("1");
         let port = env::var("PORT").unwrap_or_else(|_| "3000".to_owned());
         let app_url = env::var("APP_URL")
-            .unwrap_or_else(|_| format!("http://127.0.0.1:{port}"))
+            .unwrap_or_else(|_| format!("http://localhost:{port}"))
             .trim_end_matches('/')
             .to_owned();
 
@@ -167,7 +168,30 @@ fn take_flow(cx: &Cx) -> Result<LoginFlow> {
 
 #[route(GET "/login")]
 pub async fn login(cx: &Cx) -> Result<Response> {
-    let client = auth(cx).client().await?;
+    let auth = auth(cx);
+    if !auth.is_prod {
+        let expected = Url::parse(&auth.app_url)?;
+        let expected_host = match expected.port() {
+            Some(port) => format!("{}:{port}", expected.host_str().unwrap_or_default()),
+            None => expected.host_str().unwrap_or_default().to_owned(),
+        };
+        let request_host = headers(cx)
+            .get(header::HOST)
+            .and_then(|host| host.to_str().ok());
+        if request_host != Some(expected_host.as_str()) {
+            return (
+                StatusCode::FOUND,
+                [(
+                    header::LOCATION,
+                    HeaderValue::from_str(&format!("{}/login", auth.app_url))?,
+                )],
+                (),
+            )
+                .into_response(cx);
+        }
+    }
+
+    let client = auth.client().await?;
     let (pkce_challenge, pkce_verifier) = PkceCodeChallenge::new_random_sha256();
     let (url, state, nonce) = client
         .authorize_url(
