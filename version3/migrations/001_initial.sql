@@ -26,3 +26,114 @@ CREATE TABLE IF NOT EXISTS water_log (
 );
 CREATE INDEX IF NOT EXISTS water_log_user_consumed_idx
     ON water_log(user_id, consumed_at DESC);
+
+CREATE TABLE IF NOT EXISTS nutrients (
+    id            UUID PRIMARY KEY DEFAULT uuidv7(),
+    code          TEXT NOT NULL UNIQUE,
+    display_name  TEXT NOT NULL,
+    unit          TEXT NOT NULL CHECK (unit IN ('g', 'kJ')),
+    category      TEXT NOT NULL,
+    display_order INTEGER NOT NULL DEFAULT 0,
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS nutrient_source_keys (
+    source       TEXT NOT NULL CHECK (source IN ('fineli', 'open_food_facts')),
+    source_key   TEXT NOT NULL,
+    nutrient_id  UUID NOT NULL REFERENCES nutrients(id) ON DELETE RESTRICT,
+    source_unit  TEXT NOT NULL,
+    PRIMARY KEY (source, source_key)
+);
+CREATE INDEX IF NOT EXISTS nutrient_source_keys_nutrient_idx
+    ON nutrient_source_keys(nutrient_id);
+
+CREATE TABLE IF NOT EXISTS foods (
+    id             UUID PRIMARY KEY DEFAULT uuidv7(),
+    owner_user_id  UUID REFERENCES users(id) ON DELETE CASCADE,
+    source         TEXT NOT NULL CHECK (source IN ('fineli', 'open_food_facts', 'custom')),
+    source_id      TEXT,
+    display_name   TEXT NOT NULL CHECK (display_name <> ''),
+    brand          TEXT,
+    basis_unit     TEXT NOT NULL CHECK (basis_unit IN ('g', 'ml', 'count')),
+    source_data    JSONB NOT NULL DEFAULT '{}'::jsonb,
+    is_archived    BOOLEAN NOT NULL DEFAULT false,
+    created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CHECK (
+        (source = 'custom' AND owner_user_id IS NOT NULL AND source_id IS NULL)
+        OR
+        (source IN ('fineli', 'open_food_facts') AND owner_user_id IS NULL AND source_id IS NOT NULL)
+    )
+);
+CREATE UNIQUE INDEX IF NOT EXISTS foods_source_id_idx
+    ON foods(source, source_id)
+    WHERE source_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS foods_owner_idx ON foods(owner_user_id)
+    WHERE owner_user_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS foods_display_name_idx ON foods(lower(display_name));
+
+CREATE TABLE IF NOT EXISTS food_aliases (
+    id         UUID PRIMARY KEY DEFAULT uuidv7(),
+    food_id    UUID NOT NULL REFERENCES foods(id) ON DELETE CASCADE,
+    name       TEXT NOT NULL CHECK (name <> ''),
+    locale     TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS food_aliases_unique_idx
+    ON food_aliases(food_id, lower(name), COALESCE(locale, ''));
+CREATE INDEX IF NOT EXISTS food_aliases_name_idx ON food_aliases(lower(name));
+
+CREATE TABLE IF NOT EXISTS food_nutrients (
+    food_id      UUID NOT NULL REFERENCES foods(id) ON DELETE CASCADE,
+    nutrient_id  UUID NOT NULL REFERENCES nutrients(id) ON DELETE RESTRICT,
+    value        DOUBLE PRECISION NOT NULL
+                 CHECK (value >= 0 AND value < 'Infinity'::double precision),
+    PRIMARY KEY (food_id, nutrient_id)
+);
+CREATE INDEX IF NOT EXISTS food_nutrients_nutrient_idx
+    ON food_nutrients(nutrient_id);
+
+CREATE TABLE IF NOT EXISTS food_shortcuts (
+    id         UUID PRIMARY KEY DEFAULT uuidv7(),
+    user_id    UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    food_id    UUID NOT NULL REFERENCES foods(id) ON DELETE CASCADE,
+    name       TEXT NOT NULL CHECK (name <> ''),
+    amount     DOUBLE PRECISION NOT NULL
+               CHECK (amount > 0 AND amount < 'Infinity'::double precision),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS food_shortcuts_name_idx
+    ON food_shortcuts(user_id, food_id, lower(name));
+
+CREATE TABLE IF NOT EXISTS food_entries (
+    id                    UUID PRIMARY KEY DEFAULT uuidv7(),
+    user_id               UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    food_id               UUID REFERENCES foods(id) ON DELETE SET NULL,
+    amount                DOUBLE PRECISION NOT NULL
+                          CHECK (amount > 0 AND amount < 'Infinity'::double precision),
+    unit                  TEXT NOT NULL CHECK (unit IN ('g', 'ml', 'count')),
+    eaten_at              TIMESTAMPTZ NOT NULL DEFAULT now(),
+    food_name             TEXT NOT NULL,
+    food_brand            TEXT,
+    food_source           TEXT NOT NULL CHECK (food_source IN ('fineli', 'open_food_facts', 'custom')),
+    food_source_id        TEXT,
+    food_basis_unit       TEXT NOT NULL CHECK (food_basis_unit IN ('g', 'ml', 'count')),
+    created_at            TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS food_entries_user_eaten_idx
+    ON food_entries(user_id, eaten_at DESC);
+CREATE INDEX IF NOT EXISTS food_entries_food_idx ON food_entries(food_id);
+
+CREATE TABLE IF NOT EXISTS food_entry_nutrients (
+    food_entry_id  UUID NOT NULL REFERENCES food_entries(id) ON DELETE CASCADE,
+    nutrient_id    UUID NOT NULL REFERENCES nutrients(id) ON DELETE RESTRICT,
+    basis_value    DOUBLE PRECISION NOT NULL
+                   CHECK (basis_value >= 0 AND basis_value < 'Infinity'::double precision),
+    consumed_value DOUBLE PRECISION NOT NULL
+                   CHECK (consumed_value >= 0 AND consumed_value < 'Infinity'::double precision),
+    PRIMARY KEY (food_entry_id, nutrient_id)
+);
+CREATE INDEX IF NOT EXISTS food_entry_nutrients_nutrient_idx
+    ON food_entry_nutrients(nutrient_id);

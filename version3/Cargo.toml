@@ -3,12 +3,18 @@ name = "version3"
 version = "0.1.0"
 edition = "2024"
 
+[[bin]]
+name = "import-foods"
+path = "src/bin/import_foods.rs"
+
 [dependencies]
 tokio = { version = "1.53.1", features = ["macros", "rt-multi-thread"] }
 topcoat = { version = "0.5.0", default-features = false, features = ["asset", "cookie", "font", "htmx", "router", "serve", "session", "tailwind", "view"] }
 sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "tls-rustls", "postgres", "uuid", "chrono"] }
 base64 = "0.22"
 chrono = "0.4"
+csv = "1.3"
+encoding_rs = "0.8"
 openidconnect = { version = "4.0.1", default-features = false, features = ["reqwest", "rustls-tls"] }
 rsa = { version = "0.9.8", default-features = false, features = ["getrandom", "sha2", "std", "u64_digit"] }
 serde = { version = "1", features = ["derive"] }

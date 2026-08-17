@@ -27,7 +27,7 @@ trap 'cleanup; exit 0' INT TERM
 psql "$admin_url" -v ON_ERROR_STOP=1 -c "CREATE DATABASE \"$database\"" >/dev/null
 
 cd "$root"
-"$HOME/.cargo/bin/topcoat" asset bundle >"$tmp/build.log" 2>&1 || {
+"$HOME/.cargo/bin/topcoat" asset bundle --bin version3 >"$tmp/build.log" 2>&1 || {
   cat "$tmp/build.log" >&2
   exit 1
 }
