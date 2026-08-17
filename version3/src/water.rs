@@ -152,7 +152,7 @@ pub async fn water_section(day: &Day, water: &WaterDay) -> Result {
                 </li>
             </template>
 
-            water_history(entries: &water.entries, date: day.date)
+            water_history(entries: &water.entries, date: day.date, open: false)
         </section>
     }
 }
@@ -258,7 +258,7 @@ async fn delete_water(cx: &Cx, Form(input): Form<DeleteForm>) -> Result<Response
 
     let water = load(db(cx), user.id, date, &timezone).await?;
     let fragment = view! {
-        water_history(entries: &water.entries, date: date)
+        water_history(entries: &water.entries, date: date, open: true)
         <span id="water-total-value" hx-swap-oob="outerHTML" class="font-medium text-gray-900">(water.total) " ml"</span>
     }?;
 
@@ -290,11 +290,11 @@ fn entry_count(count: usize) -> String {
 }
 
 #[topcoat::view::component]
-async fn water_history(entries: &[WaterEntry], date: NaiveDate) -> Result {
+async fn water_history(entries: &[WaterEntry], date: NaiveDate, open: bool) -> Result {
     let count = entry_count(entries.len());
 
     view! {
-        <details id="water-history" class="mt-1">
+        <details id="water-history" open=(open) class="mt-1">
             <summary class="cursor-pointer py-2 text-sm text-gray-600 hover:text-gray-900">
                 <span id="water-entry-count">(count)</span>
             </summary>

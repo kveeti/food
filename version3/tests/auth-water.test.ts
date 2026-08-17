@@ -74,8 +74,14 @@ test("water logging uses htmx and stays private to the user", async ({ page }) =
   await page.getByRole("button", { name: "250 ml" }).click();
   await expect(waterTotal(page)).toHaveText("250 ml");
   await page.getByText("1 entry", { exact: true }).click();
+  const history = page.locator("#water-history");
   await expect(page.getByRole("button", { name: "Delete 250 ml entry" })).toBeVisible();
+  await page.getByRole("button", { name: "Delete 250 ml entry" }).click();
+  await expect(history).toHaveAttribute("open", "");
+  await expect(waterTotal(page)).toHaveText("0 ml");
 
+  await page.getByRole("button", { name: "250 ml" }).click();
+  await expect(waterTotal(page)).toHaveText("250 ml");
   await page.getByRole("button", { name: "log out" }).click();
   await page.getByRole("link", { name: /bob@dev\.local/ }).click();
   await ensureTimezone(page);
