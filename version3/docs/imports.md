@@ -12,7 +12,8 @@ The importer reads release 20 CSV files as Windows-1252, handles semicolon
 separators and decimal commas, and imports all 74 components.
 
 ```bash
-cargo run --bin import-foods -- fineli ~/Downloads/Fineli_rel20_74
+cargo run --features import-tools --bin import-foods -- \
+  fineli ~/Downloads/Fineli_rel20_74
 ```
 
 Fineli release 20 is licensed under CC BY 4.0 by the Finnish Institute for

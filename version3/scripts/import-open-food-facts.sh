@@ -12,7 +12,7 @@ printf -v quoted_path '%q' "$remote_path"
 root="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$root"
 
-cargo build --bin import-foods
+cargo build --features import-tools --bin import-foods
 ssh "$host" "cat -- $quoted_path" |
   gzip -dc |
   target/debug/import-foods open-food-facts -
