@@ -92,6 +92,62 @@ button {
     content: attr(data-amount_ml) " ml";
 }
 
+.timezone-search-spinner {
+    display: none;
+    position: absolute;
+    inset: 0;
+    place-items: center;
+}
+
+.htmx-request .timezone-search-label {
+    visibility: hidden;
+}
+
+.htmx-request .timezone-search-spinner,
+.htmx-request.timezone-search-spinner {
+    display: grid;
+}
+
+.timezone-spinner {
+    display: block;
+    position: relative;
+    width: 1.15rem;
+    height: 1.15rem;
+    opacity: 0.5;
+}
+
+.timezone-spinner-leaf {
+    position: absolute;
+    top: 0;
+    left: calc(50% - 6.25%);
+    width: 12.5%;
+    height: 100%;
+    animation: timezone-spinner-fade 800ms linear infinite;
+}
+
+.timezone-spinner-leaf::before {
+    display: block;
+    width: 100%;
+    height: 30%;
+    border-radius: 999px;
+    background: currentColor;
+    content: "";
+}
+
+.timezone-spinner-leaf:nth-child(1) { transform: rotate(0deg); animation-delay: -800ms; }
+.timezone-spinner-leaf:nth-child(2) { transform: rotate(45deg); animation-delay: -700ms; }
+.timezone-spinner-leaf:nth-child(3) { transform: rotate(90deg); animation-delay: -600ms; }
+.timezone-spinner-leaf:nth-child(4) { transform: rotate(135deg); animation-delay: -500ms; }
+.timezone-spinner-leaf:nth-child(5) { transform: rotate(180deg); animation-delay: -400ms; }
+.timezone-spinner-leaf:nth-child(6) { transform: rotate(225deg); animation-delay: -300ms; }
+.timezone-spinner-leaf:nth-child(7) { transform: rotate(270deg); animation-delay: -200ms; }
+.timezone-spinner-leaf:nth-child(8) { transform: rotate(315deg); animation-delay: -100ms; }
+
+@keyframes timezone-spinner-fade {
+    from { opacity: 1; }
+    to { opacity: 0.25; }
+}
+
 @media (prefers-reduced-motion: reduce) {
     *,
     *::before,

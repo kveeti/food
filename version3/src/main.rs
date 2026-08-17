@@ -31,6 +31,7 @@ async fn main() {
         .execute(&pool)
         .await
         .unwrap();
+    let timezone_catalog = settings::TimezoneCatalog::load(&pool).await.unwrap();
 
     let auth = auth::Auth::from_env();
     let dev_provider = (!auth.is_prod).then(|| dev_oidc::DevOidc::new(&auth));
@@ -44,7 +45,8 @@ async fn main() {
         )
         .assets(AssetBundle::load().unwrap())
         .app_context(pool)
-        .app_context(auth);
+        .app_context(auth)
+        .app_context(timezone_catalog);
     let builder = app::register(builder);
     let builder = auth::register(builder);
     let builder = pwa::register(builder);

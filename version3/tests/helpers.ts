@@ -1,9 +1,9 @@
 import { expect, type Page, type TestInfo } from "@playwright/test";
 
 export async function chooseTimezone(page: Page, timezone = "Europe/Helsinki") {
-  await expect(page).toHaveURL(/\/settings$/);
+  await expect(page).toHaveURL(/\/settings\?required=1$/);
   await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
-  await page.getByRole("combobox", { name: "Timezone" }).selectOption(timezone);
+  await page.getByRole("searchbox", { name: "Timezone" }).fill(timezone);
   await page.getByRole("button", { name: "Save" }).click();
 }
 

@@ -13,6 +13,9 @@ test("dev login moves to the configured host before setting cookies", async ({ p
   await expect(page).toHaveURL(/^http:\/\/127\.0\.0\.1:8200\/dev\/oidc\/authorize/);
 
   await page.getByRole("link", { name: /alice@dev\.local/ }).click();
+  await expect(page.getByRole("searchbox", { name: "Timezone" })).toHaveValue(
+    "Europe/Helsinki",
+  );
   await chooseTimezone(page);
   await expect(page).toHaveURL("http://127.0.0.1:8200/");
 });
@@ -44,14 +47,21 @@ test("settings stores a timezone and days can move backward and forward", async 
   await page.getByRole("link", { name: "settings" }).click();
   const settingsRequest = await settingsRequestPromise;
   expect(settingsRequest.headers()["hx-request"]).toBe("true");
-  await page
-    .getByRole("combobox", { name: "Timezone" })
-    .selectOption("America/New_York");
-  await page.getByRole("button", { name: "Save" }).click();
-  await page.getByRole("link", { name: "settings" }).click();
-  await expect(page.getByRole("combobox", { name: "Timezone" })).toHaveValue(
-    "America/New_York",
-  );
+  let delaySearch = true;
+  await page.route("**/settings/timezones?*", async (route) => {
+    if (delaySearch) {
+      delaySearch = false;
+      await new Promise((resolve) => setTimeout(resolve, 300));
+    }
+    await route.continue();
+  });
+  const timezone = page.getByRole("searchbox", { name: "Timezone" });
+  await timezone.fill("America/New");
+  await expect(page.locator(".timezone-search-spinner")).toBeVisible();
+  await page.getByRole("button", { name: "America/New_York", exact: true }).click();
+
+  await expect(page).toHaveURL("/settings");
+  await expect(timezone).toHaveValue("America/New_York");
 
   await page.goto("/?date=2035-01-15");
   await expect(page.getByRole("heading", { name: "January 15, 2035" })).toBeVisible();

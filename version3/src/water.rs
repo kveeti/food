@@ -185,7 +185,7 @@ async fn water_button(amount_ml: i32, date: NaiveDate) -> Result {
 #[route(POST "/water")]
 async fn log_water(cx: &Cx, Form(input): Form<WaterForm>) -> Result<Response> {
     let user = auth::require_user(cx).await?;
-    let timezone = user.timezone.ok_or_redirect("/settings")?;
+    let timezone = user.timezone.ok_or_redirect("/settings?required=1")?;
     let date = parse_date(&input.date)?;
     if !(1..=10_000).contains(&input.amount_ml) {
         return Err(bad_request("water must be between 1 and 10000 ml").into());
@@ -242,7 +242,7 @@ struct DeleteForm {
 #[route(POST "/water/{id}/delete")]
 async fn delete_water(cx: &Cx, Form(input): Form<DeleteForm>) -> Result<Response> {
     let user = auth::require_user(cx).await?;
-    let timezone = user.timezone.ok_or_redirect("/settings")?;
+    let timezone = user.timezone.ok_or_redirect("/settings?required=1")?;
     let date = parse_date(&input.date)?;
     let id = path_param::<Id>(cx)?;
 

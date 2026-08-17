@@ -13,6 +13,7 @@ use crate::{
     day::{self, day_navigation},
     db,
     pwa::APP_ICON_192,
+    settings::SETTINGS_JS,
     water::{self, water_section},
 };
 
@@ -52,6 +53,7 @@ async fn root_layout(slot: Result) -> Result {
                 <link rel="stylesheet" href=(tailwind::stylesheet!())>
                 <script defer="true" src=(asset!("https://cdn.jsdelivr.net/npm/htmx.org@4.0.0-beta6/dist/htmx.min.js"))></script>
                 <script defer="true" src=(asset!("public/hx-optimistic.js"))></script>
+                <script defer="true" src=(SETTINGS_JS)></script>
                 <script defer="true" src=(asset!("public/register-service-worker.js"))></script>
             </head>
 
@@ -91,7 +93,7 @@ async fn root_layout(slot: Result) -> Result {
 #[page("/")]
 async fn home(cx: &Cx) -> Result {
     let user = auth::require_user(cx).await?;
-    let timezone = user.timezone.ok_or_redirect("/settings")?;
+    let timezone = user.timezone.ok_or_redirect("/settings?required=1")?;
     let day = day::Day::from_request(cx, db(cx), &timezone).await?;
     let water = water::load(db(cx), user.id, day.date, &timezone).await?;
 
