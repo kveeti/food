@@ -83,29 +83,41 @@ async fn search(pool: &sqlx::PgPool, user_id: Uuid, query: &str) -> Result<Vec<S
     if query.is_empty() {
         return Ok(Vec::new());
     }
-    let normalized_query = normalize_search_text(query);
-    let prefix_query = prefix_tsquery(query);
-    if prefix_query.is_empty() {
-        return Ok(Vec::new());
-    }
-    let title_prefix = format!("{normalized_query}%");
-    let query_terms = search_terms(query)
-        .map(str::to_lowercase)
-        .collect::<Vec<_>>();
     let rows = sqlx::query_as(
-        "WITH search AS (
-             SELECT plainto_tsquery('simple', $2)
-                    || plainto_tsquery('finnish', $2)
-                    || plainto_tsquery('swedish', $2)
-                    || plainto_tsquery('english', $2)
-                    || to_tsquery('simple', $3) AS query
+        "WITH normalized_input AS (
+             SELECT trim(regexp_replace(lower($2), '[^[:alnum:]]+', ' ', 'g')) AS normalized_query
+         ), input AS (
+             SELECT normalized_query,
+                    regexp_split_to_array(normalized_query, ' ') AS terms,
+                    plainto_tsquery('simple', $2) AS simple_exact_query,
+                    plainto_tsquery('finnish', $2) AS fi_query,
+                    plainto_tsquery('swedish', $2) AS sv_query,
+                    plainto_tsquery('english', $2) AS en_query
+             FROM normalized_input
+             WHERE char_length(replace(normalized_query, ' ', '')) >= 3
+         ), search AS (
+             SELECT input.*,
+                    to_tsquery('simple', (
+                        SELECT string_agg(
+                            CASE
+                                WHEN query_term.position = cardinality(input.terms)
+                                THEN query_term.term || ':*'
+                                ELSE query_term.term
+                            END,
+                            ' & ' ORDER BY query_term.position
+                        )
+                        FROM unnest(input.terms) WITH ORDINALITY AS query_term(term, position)
+                    )) AS simple_prefix_query
+             FROM input
          ), candidates AS (
              SELECT foods.id, foods.display_name, foods.brand, foods.source,
+                    foods.source_data, foods.search_vector,
+                    foods.search_fi_vector, foods.search_sv_vector, foods.search_en_vector,
                     energy.value / 4.184 AS energy_kcal,
-                    foods.search_vector,
-                    search.query,
-                    regexp_replace(lower(foods.display_name), '[^[:alnum:]]+', ' ', 'g') AS normalized_name,
-                    regexp_replace(lower(foods.display_name), '[^[:alnum:]/]+', ' ', 'g') AS slash_name
+                    search.*,
+                    trim(regexp_replace(lower(foods.display_name), '[^[:alnum:]]+', ' ', 'g')) AS normalized_name,
+                    trim(regexp_replace(lower(split_part(foods.display_name, ',', 1)), '[^[:alnum:]/]+', ' ', 'g')) AS primary_name,
+                    trim(regexp_replace(lower(COALESCE(foods.brand, '')), '[^[:alnum:]]+', ' ', 'g')) AS normalized_brand
              FROM foods
              CROSS JOIN search
              LEFT JOIN nutrients energy_name ON energy_name.code = 'energy'
@@ -113,42 +125,134 @@ async fn search(pool: &sqlx::PgPool, user_id: Uuid, query: &str) -> Result<Vec<S
                     ON energy.food_id = foods.id AND energy.nutrient_id = energy_name.id
              WHERE NOT foods.is_archived
                AND (foods.source <> 'custom' OR foods.owner_user_id = $1)
-               AND foods.search_vector @@ search.query
-         ), matches AS (
+               AND (
+                   foods.search_vector @@ search.simple_prefix_query
+                   OR foods.search_fi_vector @@ search.fi_query
+                   OR foods.search_sv_vector @@ search.sv_query
+                   OR foods.search_en_vector @@ search.en_query
+               )
+         ), title_scores AS (
              SELECT candidates.*,
-                    COALESCE((
-                        SELECT max(term_match.position)
-                        FROM unnest($4::text[]) AS query_terms(term)
-                        CROSS JOIN LATERAL (
-                            SELECT min(name_word.position)::integer AS position
-                            FROM unnest(regexp_split_to_array(normalized_name, ' '))
-                                 WITH ORDINALITY AS name_word(word, position)
-                            WHERE name_word.word LIKE (query_terms.term || '%')
-                        ) AS term_match
-                        HAVING count(term_match.position) = cardinality($4::text[])
-                    ), 32767) AS title_distance
+                    regexp_split_to_array(normalized_name, ' ') AS name_words,
+                    EXISTS (
+                        SELECT 1
+                        FROM regexp_split_to_table(primary_name, '/') AS alternative(name)
+                        WHERE trim(alternative.name) = normalized_query
+                    ) AS primary_exact,
+                    EXISTS (
+                        SELECT 1
+                        FROM regexp_split_to_table(primary_name, '/') AS alternative(name)
+                        WHERE trim(alternative.name) LIKE (normalized_query || '%')
+                    ) AS primary_prefix
              FROM candidates
+         ), field_scores AS (
+             SELECT title_scores.*,
+                    exact_title.distance AS exact_title_distance,
+                    prefix_title.distance AS prefix_title_distance,
+                    COALESCE(alias_scores.alias_exact, false) AS alias_exact,
+                    alias_scores.alias_distance,
+                    COALESCE(alias_scores.alias_prefix, false) AS alias_prefix
+             FROM title_scores
+             LEFT JOIN LATERAL (
+                 SELECT max(term_match.position) AS distance
+                 FROM unnest(terms) AS query_term(term)
+                 CROSS JOIN LATERAL (
+                     SELECT min(name_word.position)::integer AS position
+                     FROM unnest(name_words) WITH ORDINALITY AS name_word(word, position)
+                     WHERE name_word.word = query_term.term
+                 ) AS term_match
+                 HAVING count(term_match.position) = cardinality(terms)
+             ) AS exact_title ON true
+             LEFT JOIN LATERAL (
+                 SELECT max(term_match.position) AS distance
+                 FROM unnest(terms) WITH ORDINALITY AS query_term(term, query_position)
+                 CROSS JOIN LATERAL (
+                     SELECT min(name_word.position)::integer AS position
+                     FROM unnest(name_words) WITH ORDINALITY AS name_word(word, position)
+                     WHERE name_word.word = query_term.term
+                        OR (
+                            query_term.query_position = cardinality(terms)
+                            AND name_word.word LIKE (query_term.term || '%')
+                        )
+                 ) AS term_match
+                 HAVING count(term_match.position) = cardinality(terms)
+             ) AS prefix_title ON true
+             LEFT JOIN LATERAL (
+                 SELECT bool_or(alias_name = normalized_query) AS alias_exact,
+                        min((
+                            SELECT max(term_match.position)
+                            FROM unnest(terms) AS query_term(term)
+                            CROSS JOIN LATERAL (
+                                SELECT min(alias_word.position)::integer AS position
+                                FROM unnest(alias_words) WITH ORDINALITY AS alias_word(word, position)
+                                WHERE alias_word.word = query_term.term
+                            ) AS term_match
+                            HAVING count(term_match.position) = cardinality(terms)
+                        )) AS alias_distance,
+                        bool_or(alias_name LIKE (normalized_query || '%')) AS alias_prefix
+                 FROM (
+                     SELECT trim(regexp_replace(lower(food_aliases.name), '[^[:alnum:]]+', ' ', 'g')) AS alias_name,
+                            regexp_split_to_array(
+                                trim(regexp_replace(lower(food_aliases.name), '[^[:alnum:]]+', ' ', 'g')),
+                                ' '
+                            ) AS alias_words
+                     FROM food_aliases
+                     WHERE food_aliases.food_id = title_scores.id
+                 ) AS aliases
+             ) AS alias_scores ON true
+         ), ranked AS (
+             SELECT field_scores.*,
+                    CASE
+                        WHEN normalized_name = normalized_query THEN 0
+                        WHEN primary_exact
+                          OR alias_exact
+                          OR normalized_brand = normalized_query THEN 1
+                        WHEN exact_title_distance IS NOT NULL OR alias_distance IS NOT NULL THEN 2
+                        WHEN primary_prefix THEN 3
+                        WHEN prefix_title_distance IS NOT NULL OR alias_prefix THEN 4
+                        WHEN normalized_brand LIKE (normalized_query || ' %') THEN 5
+                        ELSE 6
+                    END AS match_class,
+                    LEAST(
+                        COALESCE(exact_title_distance, 32767),
+                        COALESCE(alias_distance, 32767),
+                        COALESCE(prefix_title_distance, 32767)
+                    ) AS match_distance,
+                    ts_rank_cd(search_vector, simple_exact_query)
+                    + ts_rank_cd(search_vector, simple_prefix_query)
+                    + ts_rank_cd(search_fi_vector, fi_query)
+                    + ts_rank_cd(search_sv_vector, sv_query)
+                    + ts_rank_cd(search_en_vector, en_query) AS relevance
+             FROM field_scores
          )
          SELECT id, display_name, brand, source, energy_kcal
-         FROM matches
+         FROM ranked
          ORDER BY
+             CASE WHEN match_class <= 1 THEN match_class ELSE 2 END,
              CASE
-                 WHEN normalized_name LIKE $5 THEN 0
-                 WHEN slash_name LIKE ('%/' || $5) THEN 1
+                 WHEN match_class > 1 AND source_data->>'food_type' = 'DISH' THEN 1
+                 ELSE 0
+             END,
+             match_class,
+             match_distance,
+             CASE WHEN lower(display_name) LIKE '%, keskiarvo,%' THEN 0 ELSE 1 END,
+             CASE COALESCE(source_data->>'process', '')
+                 WHEN 'RAW' THEN 0
+                 WHEN 'IND' THEN 1
+                 WHEN '' THEN 1
                  ELSE 2
              END,
-             title_distance,
-             char_length(display_name),
-             ts_rank_cd(search_vector, query) DESC,
+             CASE WHEN match_class <= 4
+                  THEN CASE source WHEN 'custom' THEN 0 WHEN 'fineli' THEN 1 ELSE 2 END
+             END,
+             CASE WHEN match_class <= 4 THEN char_length(display_name) END,
+             relevance DESC,
              CASE source WHEN 'custom' THEN 0 WHEN 'fineli' THEN 1 ELSE 2 END,
              display_name
          LIMIT 10",
     )
     .bind(user_id)
     .bind(query)
-    .bind(prefix_query)
-    .bind(query_terms)
-    .bind(title_prefix)
     .fetch_all(pool)
     .await?;
 
@@ -162,26 +266,6 @@ async fn search(pool: &sqlx::PgPool, user_id: Uuid, query: &str) -> Result<Vec<S
             energy_kcal,
         })
         .collect())
-}
-
-fn search_terms(query: &str) -> impl Iterator<Item = &str> {
-    query
-        .split(|character: char| !character.is_alphanumeric())
-        .filter(|part| !part.is_empty())
-}
-
-fn normalize_search_text(query: &str) -> String {
-    search_terms(query)
-        .map(str::to_lowercase)
-        .collect::<Vec<_>>()
-        .join(" ")
-}
-
-fn prefix_tsquery(query: &str) -> String {
-    search_terms(query)
-        .map(|part| format!("{}:*", part.to_lowercase()))
-        .collect::<Vec<_>>()
-        .join(" & ")
 }
 
 async fn load_preview(
@@ -335,6 +419,7 @@ pub async fn food_search(day: &Day, food: &FoodHome) -> Result {
                     type="search"
                     value=(&food.query)
                     autocomplete="off"
+                    minlength="3"
                     placeholder="Search foods"
                     hx-get="/foods/search"
                     hx-trigger="input changed delay:100ms, search"

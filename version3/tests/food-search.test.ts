@@ -21,6 +21,11 @@ test("food search previews scaled nutrients without saving", async ({ page }, te
     page.getByRole("link", { name: /Persikka\/nektariini/ }),
   ).toBeVisible();
 
+  await page.getByRole("searchbox", { name: "Search foods" }).fill("maito");
+  await expect(page.locator("#food-results a").first()).toContainText(
+    "Maito, rasvaton",
+  );
+
   await page.getByRole("searchbox", { name: "Search foods" }).fill("maito rasvaton");
   await expect(page.locator("#food-results a").first()).toContainText(
     "Maito, rasvaton",
@@ -30,6 +35,31 @@ test("food search previews scaled nutrients without saving", async ({ page }, te
   await expect(page.locator("#food-results a").first()).toContainText(
     "Maito, rasvaton",
   );
+
+  await page.getByRole("searchbox", { name: "Search foods" }).fill("omena");
+  await expect(page.locator("#food-results a").first()).toContainText(
+    "Omena, keskiarvo",
+  );
+
+  await page.getByRole("searchbox", { name: "Search foods" }).fill("apple");
+  await expect(page.locator("#food-results a").first()).toContainText(
+    "Omena, keskiarvo",
+  );
+
+  await page.getByRole("searchbox", { name: "Search foods" }).fill("salmon");
+  await expect(page.locator("#food-results a").first()).toContainText("Lohi");
+  await expect(page.getByRole("link", { name: /Taimen/ })).toHaveCount(0);
+
+  await page.getByRole("searchbox", { name: "Search foods" }).fill("mjölk");
+  await expect(page.locator("#food-results a").first()).toContainText(
+    "Maito, rasvaton",
+  );
+
+  await page.getByRole("searchbox", { name: "Search foods" }).fill("socker");
+  await expect(page.locator("#food-results a").first()).toContainText("SOKERI");
+
+  await page.getByRole("searchbox", { name: "Search foods" }).fill("rainbow");
+  await expect(page.locator("#food-results a").first()).toContainText("Honung");
 });
 
 test("food search and preview work without JavaScript", async ({ browser }, testInfo) => {

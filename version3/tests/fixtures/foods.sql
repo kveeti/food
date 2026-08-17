@@ -10,15 +10,49 @@ VALUES
 INSERT INTO foods (source, source_id, display_name, basis_unit, source_data)
 VALUES
     ('fineli', '1', 'SOKERI', 'g', '{"fixture": true}'),
-    ('fineli', '2', 'Persikka/nektariini, keskiarvo, punnittu kivineen', 'g', '{"fixture": true}'),
-    ('fineli', '3', 'Maito, rasvaton, d-vitamiinia 1 ug', 'g', '{"fixture": true}'),
-    ('fineli', '4', 'Kalakastike, kalamuhennos, maitopohjainen, rasvaton maito', 'g', '{"fixture": true}');
+    ('fineli', '2', 'Persikka/nektariini, keskiarvo, punnittu kivineen', 'g', '{"fixture": true, "food_type": "FOOD", "process": "RAW"}'),
+    ('fineli', '3', 'Maito, rasvaton, d-vitamiinia 1 ug', 'g', '{"fixture": true, "food_type": "FOOD", "process": "IND"}'),
+    ('fineli', '4', 'Kalakastike, kalamuhennos, maitopohjainen, rasvaton maito', 'g', '{"fixture": true, "food_type": "DISH", "process": "BOIL"}'),
+    ('open_food_facts', '5', 'Maitoleipä', 'g', '{"fixture": true}'),
+    ('fineli', '6', 'Maitojauhe, rasvaton', 'g', '{"fixture": true, "food_type": "FOOD", "process": "DRIE"}'),
+    ('fineli', '7', 'Omena, keskiarvo, punnittu kuorineen', 'g', '{"fixture": true, "food_type": "FOOD", "process": "RAW"}'),
+    ('open_food_facts', '8', 'Omenasose', 'g', '{"fixture": true}'),
+    ('fineli', '9', 'Taimen', 'g', '{"fixture": true, "food_type": "FOOD", "process": "RAW"}'),
+    ('fineli', '10', 'Lohi', 'g', '{"fixture": true, "food_type": "FOOD", "process": "RAW"}'),
+    ('fineli', '12', 'Kirjolohi', 'g', '{"fixture": true, "food_type": "FOOD", "process": "RAW"}');
+
+INSERT INTO foods (source, source_id, display_name, brand, basis_unit, source_data)
+VALUES ('open_food_facts', '11', 'Honung', 'Rainbow', 'g', '{"fixture": true}');
 
 INSERT INTO food_aliases (food_id, name, locale)
 SELECT id, 'SUGAR', 'en' FROM foods WHERE source = 'fineli' AND source_id = '1';
 INSERT INTO food_aliases (food_id, name, locale)
+SELECT id, 'SOCKER', 'sv' FROM foods WHERE source = 'fineli' AND source_id = '1';
+INSERT INTO food_aliases (food_id, name, locale)
 SELECT id, 'PEACH/NECTARINE, AVERAGE, WEIGHED WITH STONE', 'en'
 FROM foods WHERE source = 'fineli' AND source_id = '2';
+INSERT INTO food_aliases (food_id, name, locale)
+SELECT id, 'Milk, 0% fat, added vitamin D', 'en'
+FROM foods WHERE source = 'fineli' AND source_id = '3';
+INSERT INTO food_aliases (food_id, name, locale)
+SELECT id, 'Mjölk, fettfri, tillsatt vitamin D', 'sv'
+FROM foods WHERE source = 'fineli' AND source_id = '3';
+INSERT INTO food_aliases (food_id, name, locale)
+SELECT id, 'Apple, average, weighed with peel', 'en'
+FROM foods WHERE source = 'fineli' AND source_id = '7';
+INSERT INTO food_aliases (food_id, name, locale)
+SELECT id, 'Äpple, medelvärde, vägd med skal', 'sv'
+FROM foods WHERE source = 'fineli' AND source_id = '7';
+INSERT INTO food_aliases (food_id, name, locale)
+SELECT id, 'Trout', 'en' FROM foods WHERE source = 'fineli' AND source_id = '9';
+INSERT INTO food_aliases (food_id, name, locale)
+SELECT id, 'Salmo trutta', 'sci' FROM foods WHERE source = 'fineli' AND source_id = '9';
+INSERT INTO food_aliases (food_id, name, locale)
+SELECT id, 'Salmon', 'en' FROM foods WHERE source = 'fineli' AND source_id = '10';
+INSERT INTO food_aliases (food_id, name, locale)
+SELECT id, 'Lax', 'sv' FROM foods WHERE source = 'fineli' AND source_id = '10';
+INSERT INTO food_aliases (food_id, name, locale)
+SELECT id, 'Rainbow trout', 'en' FROM foods WHERE source = 'fineli' AND source_id = '12';
 
 INSERT INTO food_nutrients (food_id, nutrient_id, value)
 SELECT foods.id, nutrients.id, values.value

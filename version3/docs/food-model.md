@@ -24,11 +24,14 @@ old diary references valid.
 
 `food_aliases` stores translated and alternate search names. `display_name`
 stays on `foods` so normal rendering needs no alias join. PostgreSQL maintains a
-weighted `tsvector` from the name, brand, and aliases with Finnish, Swedish,
-English, and simple dictionaries. Search uses its GIN index, language stemming,
-and token-prefix queries for typeahead. Exact title prefixes rank first,
-slash-separated alternate names rank next, then names with all query terms near
-the start. Query term order does not hide a direct food-name match.
+simple search vector plus separate Finnish, Swedish, and English vectors. Each
+language query only matches its own vector, which avoids cross-language stemming
+errors. GIN indexes find candidates after three typed characters.
+
+Ranking prefers exact names, brands, slash-separated primary names, whole title
+or alias words, and then final-token prefixes. Query term order does not hide a
+direct food-name match. Fineli foods rank above dishes for non-exact searches;
+average and untreated foods break close ties before processed variants.
 
 ## Nutrients
 
