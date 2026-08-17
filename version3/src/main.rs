@@ -2,8 +2,10 @@ mod app;
 mod auth;
 mod day;
 mod dev_oidc;
+mod food;
 mod pwa;
 mod settings;
+mod ui;
 mod water;
 
 use std::time::Duration;
@@ -49,6 +51,7 @@ async fn main() {
         .app_context(timezone_catalog);
     let builder = app::register(builder);
     let builder = auth::register(builder);
+    let builder = food::register(builder);
     let builder = pwa::register(builder);
     let builder = settings::register(builder);
     let builder = water::register(builder);

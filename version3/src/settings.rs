@@ -12,7 +12,7 @@ use topcoat::{
     view::view,
 };
 
-use crate::{auth, db};
+use crate::{auth, db, ui::search_spinner};
 
 pub const SETTINGS_JS: Asset = asset!("public/settings.js");
 
@@ -130,7 +130,7 @@ async fn settings(cx: &Cx) -> Result {
                             hx-indicator="#timezone-search"
                             class="relative min-w-23 rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-800 hover:bg-gray-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-500"
                         >
-                            <span class="timezone-search-label">"Search"</span>
+                            <span class="search-label">"Search"</span>
                             search_spinner()
                         </button>
                     </div>
@@ -189,24 +189,6 @@ async fn search_timezones(cx: &Cx) -> Result {
                 </ul>
             }
         }
-    }
-}
-
-#[topcoat::view::component]
-async fn search_spinner() -> Result {
-    view! {
-        <span class="timezone-search-spinner" aria-hidden="true">
-            <span class="timezone-spinner">
-                <span class="timezone-spinner-leaf"></span>
-                <span class="timezone-spinner-leaf"></span>
-                <span class="timezone-spinner-leaf"></span>
-                <span class="timezone-spinner-leaf"></span>
-                <span class="timezone-spinner-leaf"></span>
-                <span class="timezone-spinner-leaf"></span>
-                <span class="timezone-spinner-leaf"></span>
-                <span class="timezone-spinner-leaf"></span>
-            </span>
-        </span>
     }
 }
 

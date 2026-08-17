@@ -57,7 +57,7 @@ test("settings stores a timezone and days can move backward and forward", async 
   });
   const timezone = page.getByRole("searchbox", { name: "Timezone" });
   await timezone.fill("America/New");
-  await expect(page.locator(".timezone-search-spinner")).toBeVisible();
+  await expect(page.locator(".search-spinner")).toBeVisible();
   await page.getByRole("button", { name: "America/New_York", exact: true }).click();
 
   await expect(page).toHaveURL("/settings");

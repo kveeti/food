@@ -12,6 +12,7 @@ use crate::{
     auth,
     day::{self, day_navigation},
     db,
+    food::{self, food_search},
     pwa::APP_ICON_192,
     settings::SETTINGS_JS,
     water::{self, water_section},
@@ -95,13 +96,14 @@ async fn home(cx: &Cx) -> Result {
     let user = auth::require_user(cx).await?;
     let timezone = user.timezone.ok_or_redirect("/settings?required=1")?;
     let day = day::Day::from_request(cx, db(cx), &timezone).await?;
+    let food = food::home_state(cx, user.id, day.date).await?;
     let water = water::load(db(cx), user.id, day.date, &timezone).await?;
 
     view! {
         <main class="mx-auto w-full max-w-(--page-width) px-3 pb-[calc(var(--nav-height)+2rem)] pt-6 sm:px-6 sm:pb-12 sm:pt-10">
             day_navigation(day: &day)
 
-            <div class="min-h-32"></div>
+            food_search(day: &day, food: &food)
 
             water_section(day: &day, water: &water)
         </main>
