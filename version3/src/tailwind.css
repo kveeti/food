@@ -20,6 +20,9 @@
     --gray-900: oklch(24% 0.005 70deg);
     --gray-950: oklch(17% 0.004 70deg);
     --gray-1000: oklch(13% 0.003 70deg);
+
+    --danger-surface: oklch(94% 0.025 25deg);
+    --danger-text: oklch(45% 0.14 25deg);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -40,6 +43,9 @@
         --gray-900: oklch(89% 0 none);
         --gray-950: oklch(93% 0 none);
         --gray-1000: oklch(96% 0 none);
+
+        --danger-surface: oklch(25% 0.04 25deg);
+        --danger-text: oklch(75% 0.11 25deg);
     }
 }
 
@@ -68,6 +74,9 @@
     --color-gray-900: var(--gray-900);
     --color-gray-950: var(--gray-950);
     --color-gray-1000: var(--gray-1000);
+
+    --color-danger-surface: var(--danger-surface);
+    --color-danger-text: var(--danger-text);
 }
 
 html {

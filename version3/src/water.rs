@@ -336,7 +336,7 @@ async fn water_entry(entry: &WaterEntry, date: NaiveDate) -> Result {
                     <button
                         type="submit"
                         aria-label=(format!("Delete {} ml entry", entry.amount_ml))
-                        class="grid size-8 place-items-center rounded-lg border border-gray-200 text-gray-500 hover:bg-red-100 hover:text-red-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-500"
+                        class="grid size-8 place-items-center rounded-lg border border-gray-200 text-gray-500 hover:bg-danger-surface hover:text-danger-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-text"
                     >
                         <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" class="size-4">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"></path>
