@@ -184,7 +184,7 @@ async fn authorize(cx: &Cx) -> Result<Response> {
                     <input type="hidden" name="code_challenge" value=(&query.code_challenge)>
                     <input type="hidden" name="code_challenge_method" value=(&query.code_challenge_method)>
                     <input name="sub" required="true" placeholder="new-user-sub" style="padding: .4rem">
-                    <button type="submit" style="padding: .4rem">"Log in"</button>
+                    <button type="submit" style="padding: .4rem .75rem; border: 1px solid #d1d5db; border-radius: .5rem; background: transparent; font-weight: 500; cursor: pointer">"Log in"</button>
                 </form>
             </body>
         </html>

@@ -128,7 +128,7 @@ async fn settings(cx: &Cx) -> Result {
                             hx-swap="innerHTML"
                             hx-sync="closest form:replace"
                             hx-indicator="#timezone-search"
-                            class="relative min-w-23 rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-800 hover:bg-gray-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-500"
+                            class="relative min-w-23 rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-800 hover:bg-gray-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-700"
                         >
                             <span class="search-label">"Search"</span>
                             search_spinner()
@@ -142,7 +142,7 @@ async fn settings(cx: &Cx) -> Result {
 
                     <button
                         type="submit"
-                        class="rounded-lg bg-gray-900 px-4 py-2.5 text-base font-medium text-white hover:bg-gray-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-700 active:bg-gray-1000"
+                        class="rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-800 hover:bg-gray-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-700"
                     >
                         "Save"
                     </button>
@@ -173,14 +173,14 @@ async fn search_timezones(cx: &Cx) -> Result {
             if matches.is_empty() {
                 <p class="py-2 text-sm text-gray-500">"No matching timezones"</p>
             } else {
-                <ul class="overflow-hidden rounded-lg border border-gray-200">
+                <ul class="space-y-2">
                     for timezone in matches {
-                        <li class="border-t border-gray-200 first:border-t-0">
+                        <li>
                             <button
                                 type="submit"
                                 name="timezone"
                                 value=(timezone)
-                                class="w-full px-3 py-2.5 text-left text-sm text-gray-900 hover:bg-gray-100 focus-visible:bg-gray-100 focus-visible:outline-none"
+                                class="w-full rounded-lg border border-gray-200 px-3 py-2 text-left text-sm font-medium text-gray-800 hover:bg-gray-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-700"
                             >
                                 (timezone)
                             </button>

@@ -138,7 +138,7 @@ pub async fn water_section(day: &Day, water: &WaterDay) -> Result {
                     >
                     <button
                         type="submit"
-                        class="rounded-lg bg-gray-900 px-4 py-2 text-base font-medium text-white hover:bg-gray-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-700 active:bg-gray-1000"
+                        class="rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-800 hover:bg-gray-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-700"
                     >
                         "Add"
                     </button>
@@ -174,7 +174,7 @@ async fn water_button(amount_ml: i32, date: NaiveDate) -> Result {
             <input type="hidden" name="date" value=(date)>
             <button
                 type="submit"
-                class="w-full rounded-lg bg-gray-900 px-3 py-2 text-sm font-medium text-white hover:bg-gray-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-700 active:bg-gray-1000"
+                class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-800 hover:bg-gray-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-700"
             >
                 (amount_ml) " ml"
             </button>
@@ -336,7 +336,7 @@ async fn water_entry(entry: &WaterEntry, date: NaiveDate) -> Result {
                     <button
                         type="submit"
                         aria-label=(format!("Delete {} ml entry", entry.amount_ml))
-                        class="grid size-8 place-items-center rounded-lg text-gray-500 hover:bg-red-100 hover:text-red-700 focus-visible:outline-2 focus-visible:outline-red-500"
+                        class="grid size-8 place-items-center rounded-lg border border-gray-200 text-gray-500 hover:bg-red-100 hover:text-red-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-500"
                     >
                         <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" class="size-4">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"></path>

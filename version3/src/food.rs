@@ -439,7 +439,7 @@ pub async fn food_search(day: &Day, food: &FoodHome) -> Result {
                     hx-swap="innerHTML"
                     hx-sync="closest form:replace"
                     hx-indicator="#food-search-button"
-                    class="relative min-w-23 rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-800 hover:bg-gray-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-500"
+                    class="relative min-w-23 rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-800 hover:bg-gray-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-700"
                 >
                     <span class="search-label">"Search"</span>
                     search_spinner()
@@ -542,7 +542,7 @@ async fn food_preview(preview: &FoodPreview) -> Result {
                         class="w-full rounded-lg border border-gray-300 bg-form px-3 py-2 text-base text-gray-1000 outline-none focus:border-gray-500 focus:ring-1 focus:ring-gray-400"
                     >
                 </label>
-                <button type="submit" class="rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-800 hover:bg-gray-100">
+                <button type="submit" class="rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-800 hover:bg-gray-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-700">
                     "Preview"
                 </button>
             </form>
