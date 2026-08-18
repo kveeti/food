@@ -77,6 +77,11 @@ sum consumed values by nutrient.
 
 Changing an imported or custom food never rewrites old entries.
 
+Daily nutrient totals must preserve the difference between unknown and zero. If
+any entry lacks a nutrient, the app can still calculate the known subtotal, but
+it must not present that subtotal as complete. A future user setting may choose
+between showing an incomplete subtotal and hiding an incomplete total.
+
 ## Source rules
 
 Fineli is imported as a complete public catalog with Finnish display names and
