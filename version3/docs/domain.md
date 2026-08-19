@@ -42,9 +42,10 @@ The meal link is optional. A food entry stays valid and visible when its meal is
 missing. Empty meals are hidden.
 
 When logging food, the app automatically selects the most recent meal whose
-latest entry is no more than two hours old. The selected meal stays visible and
-the person can choose another meal or start a new one. The app does not guess
-the meal kind from the time.
+latest entry is no more than two hours old. The selected meal stays visible. A
+person may explicitly continue the latest meal even after two hours, but cannot
+continue it if another meal was logged after it; repeating it starts a new meal.
+The app does not guess the meal kind from the time.
 
 ## Recipe
 
