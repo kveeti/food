@@ -1,12 +1,13 @@
-use chrono::NaiveDate;
-use sqlx::types::Uuid;
+use chrono::{DateTime, NaiveDate, Utc};
+use sqlx::{PgPool, types::Uuid};
 use topcoat::{
     Result,
     context::Cx,
     router::{
-        IntoResponse, Response, RouterBuilder,
+        HeaderValue, IntoResponse, Response, RouterBuilder, StatusCode,
+        content::Form,
         error::{RouterErrorExt, bad_request, not_found},
-        path_param, query_params, route,
+        header, path_param, query_params, route,
     },
     view::view,
 };
@@ -14,7 +15,12 @@ use topcoat::{
 use crate::{auth, day::Day, db, ui::search_spinner};
 
 pub fn register(builder: RouterBuilder) -> RouterBuilder {
-    builder.route(search_foods).route(preview_food)
+    builder
+        .route(search_foods)
+        .route(preview_food)
+        .route(log_food)
+        .route(update_entry)
+        .route(delete_entry)
 }
 
 #[derive(Debug)]
@@ -34,6 +40,14 @@ struct NutrientValue {
     unit: String,
 }
 
+#[derive(Clone, Debug)]
+struct LatestMeal {
+    id: Uuid,
+    name: Option<String>,
+    local_time: String,
+    active: bool,
+}
+
 #[derive(Debug)]
 struct FoodPreview {
     id: Uuid,
@@ -44,6 +58,44 @@ struct FoodPreview {
     amount: f64,
     date: NaiveDate,
     nutrients: Vec<NutrientValue>,
+    latest_meal: Option<LatestMeal>,
+}
+
+#[derive(Debug)]
+struct FoodEntry {
+    id: Uuid,
+    name: String,
+    brand: Option<String>,
+    amount: f64,
+    unit: String,
+    eaten_at: DateTime<Utc>,
+    local_time: String,
+    energy_kcal: Option<f64>,
+}
+
+#[derive(Debug)]
+struct Meal {
+    id: Option<Uuid>,
+    name: Option<String>,
+    local_time: String,
+    entries: Vec<FoodEntry>,
+    energy_kcal: f64,
+    energy_complete: bool,
+}
+
+#[derive(Debug)]
+struct NutrientTotal {
+    value: f64,
+    complete: bool,
+}
+
+#[derive(Debug)]
+struct DailyTotals {
+    energy: NutrientTotal,
+    protein: NutrientTotal,
+    carbohydrate: NutrientTotal,
+    fat: NutrientTotal,
+    fibre: NutrientTotal,
 }
 
 #[derive(Debug)]
@@ -51,6 +103,9 @@ pub struct FoodHome {
     query: String,
     results: Vec<SearchResult>,
     preview: Option<FoodPreview>,
+    meals: Vec<Meal>,
+    totals: DailyTotals,
+    latest_meal: Option<LatestMeal>,
 }
 
 #[topcoat::router::query_params(error = bad_request)]
@@ -60,14 +115,23 @@ struct HomeFoodQuery {
     amount: Option<String>,
 }
 
-pub async fn home_state(cx: &Cx, user_id: Uuid, date: NaiveDate) -> Result<FoodHome> {
+pub async fn home_state(
+    cx: &Cx,
+    user_id: Uuid,
+    date: NaiveDate,
+    timezone: &str,
+) -> Result<FoodHome> {
     let query = query_params::<HomeFoodQuery>(cx)?;
     let food_query = query.food_query.as_deref().unwrap_or_default().trim();
-    let results = search(db(cx), user_id, food_query).await?;
+    let (results, (meals, totals), latest_meal) = tokio::try_join!(
+        search(db(cx), user_id, food_query),
+        load_day(db(cx), user_id, date, timezone),
+        load_latest_meal(db(cx), user_id, date, timezone),
+    )?;
     let preview = if let Some(food) = query.food.as_deref() {
         let food = Uuid::parse_str(food).map_err(|_| bad_request("invalid food"))?;
         let amount = parse_amount(query.amount.as_deref())?;
-        Some(load_preview(cx, user_id, food, amount, date).await?)
+        Some(load_preview(cx, user_id, food, amount, date, latest_meal.clone()).await?)
     } else {
         None
     };
@@ -76,7 +140,166 @@ pub async fn home_state(cx: &Cx, user_id: Uuid, date: NaiveDate) -> Result<FoodH
         query: food_query.to_owned(),
         results,
         preview,
+        meals,
+        totals,
+        latest_meal,
     })
+}
+
+async fn load_day(
+    pool: &PgPool,
+    user_id: Uuid,
+    date: NaiveDate,
+    timezone: &str,
+) -> Result<(Vec<Meal>, DailyTotals)> {
+    type EntryRow = (
+        Uuid,
+        Option<Uuid>,
+        Option<String>,
+        String,
+        String,
+        Option<String>,
+        f64,
+        String,
+        DateTime<Utc>,
+        String,
+        Option<f64>,
+    );
+
+    let (entry_rows, total_rows): (Vec<EntryRow>, Vec<(String, f64, bool)>) =
+        tokio::try_join!(
+            sqlx::query_as(
+                "SELECT entries.id, entries.meal_id, meals.name,
+                        to_char(COALESCE(meals.started_at, entries.eaten_at) AT TIME ZONE $3, 'HH24:MI'),
+                        entries.food_name, entries.food_brand, entries.amount, entries.unit,
+                        entries.eaten_at,
+                        to_char(entries.eaten_at AT TIME ZONE $3, 'HH24:MI'),
+                        energy.consumed_value / 4.184
+                 FROM food_entries entries
+                 LEFT JOIN meals ON meals.id = entries.meal_id AND meals.user_id = entries.user_id
+                 LEFT JOIN nutrients energy_name ON energy_name.code = 'energy'
+                 LEFT JOIN food_entry_nutrients energy
+                        ON energy.food_entry_id = entries.id
+                       AND energy.nutrient_id = energy_name.id
+                 WHERE entries.user_id = $1
+                   AND entries.eaten_at >= ($2::date::timestamp AT TIME ZONE $3)
+                   AND entries.eaten_at < (($2::date + 1)::timestamp AT TIME ZONE $3)
+                 ORDER BY entries.meal_id IS NULL, meals.started_at, entries.eaten_at, entries.created_at",
+            )
+            .bind(user_id)
+            .bind(date)
+            .bind(timezone)
+            .fetch_all(pool),
+            sqlx::query_as(
+                "WITH day_entries AS (
+                     SELECT id
+                     FROM food_entries
+                     WHERE user_id = $1
+                       AND eaten_at >= ($2::date::timestamp AT TIME ZONE $3)
+                       AND eaten_at < (($2::date + 1)::timestamp AT TIME ZONE $3)
+                 )
+                 SELECT nutrients.code,
+                        COALESCE(SUM(values.consumed_value), 0),
+                        COUNT(values.food_entry_id) = (SELECT COUNT(*) FROM day_entries)
+                 FROM nutrients
+                 LEFT JOIN day_entries ON true
+                 LEFT JOIN food_entry_nutrients values
+                        ON values.food_entry_id = day_entries.id
+                       AND values.nutrient_id = nutrients.id
+                 WHERE nutrients.code = ANY($4)
+                 GROUP BY nutrients.id, nutrients.code",
+            )
+            .bind(user_id)
+            .bind(date)
+            .bind(timezone)
+            .bind(["energy", "protein", "carbohydrate", "fat", "fibre"])
+            .fetch_all(pool),
+        )?;
+
+    let mut meals: Vec<Meal> = Vec::new();
+    for row in entry_rows {
+        if meals.last().is_none_or(|meal| meal.id != row.1) {
+            meals.push(Meal {
+                id: row.1,
+                name: row.2.clone(),
+                local_time: row.3.clone(),
+                entries: Vec::new(),
+                energy_kcal: 0.0,
+                energy_complete: true,
+            });
+        }
+        let meal = meals.last_mut().expect("meal was just added");
+        if let Some(energy) = row.10 {
+            meal.energy_kcal += energy;
+        } else {
+            meal.energy_complete = false;
+        }
+        meal.entries.push(FoodEntry {
+            id: row.0,
+            name: row.4,
+            brand: row.5,
+            amount: row.6,
+            unit: row.7,
+            eaten_at: row.8,
+            local_time: row.9,
+            energy_kcal: row.10,
+        });
+    }
+
+    let total = |code: &str, energy: bool| {
+        let row = total_rows.iter().find(|row| row.0 == code);
+        NutrientTotal {
+            value: row.map_or(0.0, |row| if energy { row.1 / 4.184 } else { row.1 }),
+            complete: row.is_none_or(|row| row.2),
+        }
+    };
+    let totals = DailyTotals {
+        energy: total("energy", true),
+        protein: total("protein", false),
+        carbohydrate: total("carbohydrate", false),
+        fat: total("fat", false),
+        fibre: total("fibre", false),
+    };
+
+    Ok((meals, totals))
+}
+
+async fn load_latest_meal(
+    pool: &PgPool,
+    user_id: Uuid,
+    date: NaiveDate,
+    timezone: &str,
+) -> Result<Option<LatestMeal>> {
+    let row: Option<(Uuid, Option<String>, String, bool)> = sqlx::query_as(
+        "WITH target AS (
+             SELECT (($2::date + (now() AT TIME ZONE $3)::time)::timestamp AT TIME ZONE $3) AS eaten_at
+         )
+         SELECT meals.id, meals.name,
+                to_char(meals.started_at AT TIME ZONE $3, 'HH24:MI'),
+                MAX(entries.eaten_at) BETWEEN target.eaten_at - INTERVAL '2 hours' AND target.eaten_at
+         FROM meals
+         JOIN food_entries entries ON entries.meal_id = meals.id
+         CROSS JOIN target
+         WHERE meals.user_id = $1
+           AND entries.user_id = $1
+           AND entries.eaten_at >= ($2::date::timestamp AT TIME ZONE $3)
+           AND entries.eaten_at < (($2::date + 1)::timestamp AT TIME ZONE $3)
+         GROUP BY meals.id, target.eaten_at
+         ORDER BY MAX(entries.eaten_at) DESC
+         LIMIT 1",
+    )
+    .bind(user_id)
+    .bind(date)
+    .bind(timezone)
+    .fetch_optional(pool)
+    .await?;
+
+    Ok(row.map(|(id, name, local_time, active)| LatestMeal {
+        id,
+        name,
+        local_time,
+        active,
+    }))
 }
 
 async fn search(pool: &sqlx::PgPool, user_id: Uuid, query: &str) -> Result<Vec<SearchResult>> {
@@ -274,6 +497,7 @@ async fn load_preview(
     food_id: Uuid,
     amount: Option<f64>,
     date: NaiveDate,
+    latest_meal: Option<LatestMeal>,
 ) -> Result<FoodPreview> {
     let rows: Vec<(
         String,
@@ -327,6 +551,7 @@ async fn load_preview(
         amount,
         date,
         nutrients,
+        latest_meal,
     })
 }
 
@@ -380,7 +605,7 @@ struct PreviewQuery {
 #[route(GET "/foods/{food_id}/preview")]
 async fn preview_food(cx: &Cx) -> Result<Response> {
     let user = auth::require_user(cx).await?;
-    user.timezone.ok_or_redirect("/settings?required=1")?;
+    let timezone = user.timezone.ok_or_redirect("/settings?required=1")?;
     let food = path_param::<FoodId>(cx)?;
     let query = query_params::<PreviewQuery>(cx)?;
     let amount = parse_amount(query.amount.as_deref())?;
@@ -390,7 +615,8 @@ async fn preview_food(cx: &Cx) -> Result<Response> {
         .map(parse_date)
         .transpose()?
         .ok_or_else(|| bad_request("date is required"))?;
-    let preview = load_preview(cx, user.id, *food, amount, date).await?;
+    let latest_meal = load_latest_meal(db(cx), user.id, date, &timezone).await?;
+    let preview = load_preview(cx, user.id, *food, amount, date, latest_meal).await?;
     let fragment = view! {
         food_preview(preview: &preview)
     }?;
@@ -402,13 +628,234 @@ fn parse_date(date: &str) -> Result<NaiveDate> {
         .map_err(|_| bad_request("date must use YYYY-MM-DD").into())
 }
 
+#[derive(Debug, serde::Deserialize)]
+struct LogFoodForm {
+    amount: String,
+    date: String,
+    meal: String,
+    meal_name: Option<String>,
+}
+
+#[route(POST "/foods/{food_id}/entries")]
+async fn log_food(cx: &Cx, Form(input): Form<LogFoodForm>) -> Result<Response> {
+    let user = auth::require_user(cx).await?;
+    let timezone = user.timezone.ok_or_redirect("/settings?required=1")?;
+    let food_id = path_param::<FoodId>(cx)?;
+    let date = parse_date(&input.date)?;
+    let amount = parse_required_amount(&input.amount)?;
+    let meal_name = parse_meal_name(input.meal_name.as_deref())?;
+    let mut transaction = db(cx).begin().await?;
+    let eaten_at: DateTime<Utc> = sqlx::query_scalar(
+        "SELECT (($1::date + (now() AT TIME ZONE $2)::time)::timestamp AT TIME ZONE $2)",
+    )
+    .bind(date)
+    .bind(&timezone)
+    .fetch_one(&mut *transaction)
+    .await?;
+
+    let meal_id = if input.meal == "new" {
+        sqlx::query_scalar(
+            "INSERT INTO meals (user_id, name, started_at)
+             VALUES ($1, $2, $3)
+             RETURNING id",
+        )
+        .bind(user.id)
+        .bind(meal_name)
+        .bind(eaten_at)
+        .fetch_one(&mut *transaction)
+        .await?
+    } else {
+        let requested =
+            Uuid::parse_str(&input.meal).map_err(|_| bad_request("invalid meal selection"))?;
+        let latest: Option<Uuid> = sqlx::query_scalar(
+            "SELECT meals.id
+             FROM meals
+             JOIN food_entries entries ON entries.meal_id = meals.id
+             WHERE meals.user_id = $1
+               AND entries.user_id = $1
+               AND entries.eaten_at >= ($2::date::timestamp AT TIME ZONE $3)
+               AND entries.eaten_at < (($2::date + 1)::timestamp AT TIME ZONE $3)
+             GROUP BY meals.id
+             ORDER BY MAX(entries.eaten_at) DESC
+             LIMIT 1",
+        )
+        .bind(user.id)
+        .bind(date)
+        .bind(&timezone)
+        .fetch_optional(&mut *transaction)
+        .await?;
+        if latest != Some(requested) {
+            return Err(bad_request("only the latest meal can be continued").into());
+        }
+        requested
+    };
+
+    let entry: Option<Uuid> = sqlx::query_scalar(
+        "WITH selected_food AS (
+             SELECT id, display_name, brand, source, source_id, basis_unit
+             FROM foods
+             WHERE id = $1
+               AND NOT is_archived
+               AND (source <> 'custom' OR owner_user_id = $2)
+         ), new_entry AS (
+             INSERT INTO food_entries (
+                 user_id, meal_id, food_id, amount, unit, eaten_at,
+                 food_name, food_brand, food_source, food_source_id
+             )
+             SELECT $2, $3, id, $4, basis_unit, $5,
+                    display_name, brand, source, source_id
+             FROM selected_food
+             RETURNING id, amount, unit
+         ), nutrient_snapshot AS (
+             INSERT INTO food_entry_nutrients (
+                 food_entry_id, nutrient_id, basis_value, consumed_value
+             )
+             SELECT new_entry.id, food_nutrients.nutrient_id, food_nutrients.value,
+                    CASE new_entry.unit
+                        WHEN 'count' THEN food_nutrients.value * new_entry.amount
+                        ELSE food_nutrients.value * new_entry.amount / 100.0
+                    END
+             FROM new_entry
+             JOIN food_nutrients ON food_nutrients.food_id = $1
+         )
+         SELECT id FROM new_entry",
+    )
+    .bind(*food_id)
+    .bind(user.id)
+    .bind(meal_id)
+    .bind(amount)
+    .bind(eaten_at)
+    .fetch_optional(&mut *transaction)
+    .await?;
+    if entry.is_none() {
+        return Err(not_found().into());
+    }
+    transaction.commit().await?;
+
+    redirect_to_day(cx, date)
+}
+
+#[path_param(error = bad_request)]
+struct EntryId(Uuid);
+
+#[derive(Debug, serde::Deserialize)]
+struct UpdateEntryForm {
+    amount: String,
+    date: String,
+}
+
+#[route(POST "/food-entries/{entry_id}")]
+async fn update_entry(cx: &Cx, Form(input): Form<UpdateEntryForm>) -> Result<Response> {
+    let user = auth::require_user(cx).await?;
+    user.timezone.ok_or_redirect("/settings?required=1")?;
+    let entry_id = path_param::<EntryId>(cx)?;
+    let amount = parse_required_amount(&input.amount)?;
+    let date = parse_date(&input.date)?;
+    let mut transaction = db(cx).begin().await?;
+    let unit: Option<String> = sqlx::query_scalar(
+        "UPDATE food_entries
+         SET amount = $1
+         WHERE id = $2 AND user_id = $3
+         RETURNING unit",
+    )
+    .bind(amount)
+    .bind(*entry_id)
+    .bind(user.id)
+    .fetch_optional(&mut *transaction)
+    .await?;
+    let Some(unit) = unit else {
+        return Err(not_found().into());
+    };
+    let factor = if unit == "count" {
+        amount
+    } else {
+        amount / 100.0
+    };
+    sqlx::query(
+        "UPDATE food_entry_nutrients
+         SET consumed_value = basis_value * $1
+         WHERE food_entry_id = $2",
+    )
+    .bind(factor)
+    .bind(*entry_id)
+    .execute(&mut *transaction)
+    .await?;
+    transaction.commit().await?;
+
+    redirect_to_day(cx, date)
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct DeleteEntryForm {
+    date: String,
+}
+
+#[route(POST "/food-entries/{entry_id}/delete")]
+async fn delete_entry(cx: &Cx, Form(input): Form<DeleteEntryForm>) -> Result<Response> {
+    let user = auth::require_user(cx).await?;
+    user.timezone.ok_or_redirect("/settings?required=1")?;
+    let entry_id = path_param::<EntryId>(cx)?;
+    let date = parse_date(&input.date)?;
+    let mut transaction = db(cx).begin().await?;
+    let meal_id: Option<Uuid> = sqlx::query_scalar(
+        "DELETE FROM food_entries
+         WHERE id = $1 AND user_id = $2
+         RETURNING meal_id",
+    )
+    .bind(*entry_id)
+    .bind(user.id)
+    .fetch_optional(&mut *transaction)
+    .await?
+    .flatten();
+    if let Some(meal_id) = meal_id {
+        sqlx::query(
+            "DELETE FROM meals
+             WHERE id = $1 AND user_id = $2
+               AND NOT EXISTS (
+                   SELECT 1 FROM food_entries WHERE meal_id = meals.id
+               )",
+        )
+        .bind(meal_id)
+        .bind(user.id)
+        .execute(&mut *transaction)
+        .await?;
+    }
+    transaction.commit().await?;
+
+    redirect_to_day(cx, date)
+}
+
+fn parse_required_amount(amount: &str) -> Result<f64> {
+    parse_amount(Some(amount))?.ok_or_else(|| bad_request("amount is required").into())
+}
+
+fn parse_meal_name(name: Option<&str>) -> Result<Option<String>> {
+    let name = name.map(str::trim).filter(|name| !name.is_empty());
+    if name.is_some_and(|name| name.chars().count() > 100) {
+        return Err(bad_request("meal name must be at most 100 characters").into());
+    }
+    Ok(name.map(str::to_owned))
+}
+
+fn redirect_to_day(cx: &Cx, date: NaiveDate) -> Result<Response> {
+    let location = format!("/?date={date}#food-section");
+    (
+        StatusCode::SEE_OTHER,
+        [(header::LOCATION, HeaderValue::from_str(&location)?)],
+        (),
+    )
+        .into_response(cx)
+}
+
 #[topcoat::view::component]
 pub async fn food_search(day: &Day, food: &FoodHome) -> Result {
+    let energy_total = total_text(&food.totals.energy, "kcal");
+
     view! {
-        <section aria-labelledby="food-heading" class="mt-10">
-            <div class="mb-3 flex items-baseline justify-between">
+        <section id="food-section" aria-labelledby="food-heading" class="mt-10">
+            <div class="mb-3 flex items-baseline justify-between gap-4">
                 <h2 id="food-heading" class="text-base font-medium text-gray-1000">"Food"</h2>
-                <span class="text-xs text-gray-500">"Preview only"</span>
+                <span aria-label="Food energy total" class="text-sm font-medium tabular-nums text-gray-900">(energy_total)</span>
             </div>
             <form method="get" action="/" class="flex gap-2">
                 <input type="hidden" name="date" value=(day.date.to_string())>
@@ -446,6 +893,14 @@ pub async fn food_search(day: &Day, food: &FoodHome) -> Result {
                 </button>
             </form>
 
+            <p class="mt-2 text-xs text-gray-500">
+                if let Some(meal) = &food.latest_meal && meal.active {
+                    "Continuing " (meal_name(meal.name.as_deref())) " · " (&meal.local_time)
+                } else {
+                    "The next food starts a new meal"
+                }
+            </p>
+
             <div id="food-results" class="mt-2">
                 search_results(results: &food.results, date: day.date)
             </div>
@@ -455,7 +910,139 @@ pub async fn food_search(day: &Day, food: &FoodHome) -> Result {
             } else {
                 <div id="food-preview" class="mt-5"></div>
             }
+
+            daily_totals(totals: &food.totals)
+            food_diary(meals: &food.meals, date: day.date)
         </section>
+    }
+}
+
+#[topcoat::view::component]
+async fn daily_totals(totals: &DailyTotals) -> Result {
+    let incomplete = !totals.energy.complete
+        || !totals.protein.complete
+        || !totals.carbohydrate.complete
+        || !totals.fat.complete
+        || !totals.fibre.complete;
+
+    view! {
+        <div aria-label="Daily nutrition totals" class="mt-6 grid grid-cols-3 gap-x-3 gap-y-3 border-y border-gray-200 py-3">
+            daily_total(label: "Energy", total: &totals.energy, unit: "kcal")
+            daily_total(label: "Protein", total: &totals.protein, unit: "g")
+            daily_total(label: "Carbs", total: &totals.carbohydrate, unit: "g")
+            daily_total(label: "Fat", total: &totals.fat, unit: "g")
+            daily_total(label: "Fibre", total: &totals.fibre, unit: "g")
+            if incomplete {
+                <p class="self-end text-xs text-gray-500">"* Incomplete"</p>
+            }
+        </div>
+    }
+}
+
+#[topcoat::view::component]
+async fn daily_total(label: &str, total: &NutrientTotal, unit: &str) -> Result {
+    view! {
+        <p>
+            <span class="block text-xs text-gray-500">(label)</span>
+            <strong class="text-sm font-medium tabular-nums">(total_text(total, unit))</strong>
+        </p>
+    }
+}
+
+#[topcoat::view::component]
+async fn food_diary(meals: &[Meal], date: NaiveDate) -> Result {
+    view! {
+        <div id="food-diary" class="mt-5">
+            if meals.is_empty() {
+                <p class="py-3 text-center text-sm text-gray-500">"No food logged"</p>
+            } else {
+                for meal in meals {
+                    <section class="border-b border-gray-200 py-3 first:border-t" aria-label=(meal_name(meal.name.as_deref()))>
+                        <header class="mb-1 flex items-baseline justify-between gap-4">
+                            <h3 class="text-sm font-medium text-gray-900">
+                                (meal_name(meal.name.as_deref())) " · " (&meal.local_time)
+                            </h3>
+                            <span class="shrink-0 text-xs tabular-nums text-gray-500">
+                                (format_number(meal.energy_kcal)) " kcal"
+                                if !meal.energy_complete { "*" }
+                            </span>
+                        </header>
+                        <ul>
+                            for entry in &meal.entries {
+                                food_entry(entry: entry, date: date)
+                            }
+                        </ul>
+                    </section>
+                }
+            }
+        </div>
+    }
+}
+
+#[topcoat::view::component]
+async fn food_entry(entry: &FoodEntry, date: NaiveDate) -> Result {
+    let amount = format!(
+        "{} {}",
+        format_amount(entry.amount),
+        entry_unit(&entry.unit)
+    );
+    let energy = entry
+        .energy_kcal
+        .map(|value| format!("{} kcal", format_number(value)))
+        .unwrap_or_else(|| "— kcal".to_owned());
+
+    view! {
+        <li class="border-t border-gray-200 first:border-t-0">
+            <details>
+                <summary class="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 py-2">
+                    <span class="min-w-0">
+                        <span class="block truncate text-sm text-gray-900">(&entry.name)</span>
+                        if let Some(brand) = &entry.brand {
+                            <span class="block truncate text-xs text-gray-500">(brand)</span>
+                        }
+                    </span>
+                    <span class="flex shrink-0 items-center gap-3 text-right text-xs tabular-nums text-gray-500">
+                        <span>
+                            <span class="block">(amount)</span>
+                            <span class="block">(energy)</span>
+                        </span>
+                        <time datetime=(entry.eaten_at.to_rfc3339())>(&entry.local_time)</time>
+                    </span>
+                </summary>
+                <div class="flex items-end gap-2 pb-3">
+                    <form method="post" action=(format!("/food-entries/{}", entry.id)) class="flex min-w-0 flex-1 items-end gap-2">
+                        <input type="hidden" name="date" value=(date.to_string())>
+                        <label class="min-w-0 flex-1 text-xs text-gray-600">
+                            <span class="mb-1 block">"Amount in " (unit_name(&entry.unit))</span>
+                            <input
+                                name="amount"
+                                type="number"
+                                inputmode="decimal"
+                                min="0.001"
+                                max="100000"
+                                step="any"
+                                required="true"
+                                value=(entry.amount)
+                                class="w-full rounded-lg border border-gray-300 bg-form px-3 py-2 text-base text-gray-1000 outline-none focus:border-gray-500 focus:ring-1 focus:ring-gray-400"
+                            >
+                        </label>
+                        <button type="submit" class="rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-800 hover:bg-gray-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-700">"Save"</button>
+                    </form>
+                    <form method="post" action=(format!("/food-entries/{}/delete", entry.id))>
+                        <input type="hidden" name="date" value=(date.to_string())>
+                        <button
+                            type="submit"
+                            aria-label=(format!("Delete {}", entry.name))
+                            class="grid size-9 place-items-center rounded-lg border border-gray-200 text-gray-500 hover:bg-danger-surface hover:text-danger-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-text"
+                        >
+                            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" class="size-4">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"></path>
+                            </svg>
+                        </button>
+                    </form>
+                </div>
+            </details>
+        </li>
     }
 }
 
@@ -519,35 +1106,41 @@ async fn food_preview(preview: &FoodPreview) -> Result {
                 }
             </div>
 
-            <form method="get" action="/" class="mb-4 flex items-end gap-2">
+            <form method="post" action=(format!("/foods/{}/entries", preview.id))>
                 <input type="hidden" name="food" value=(preview.id.to_string())>
                 <input type="hidden" name="date" value=(preview.date.to_string())>
-                <label for="food-amount" class="min-w-0 flex-1 text-sm text-gray-700">
-                    <span class="mb-1 block">"Amount in " (unit_name(&preview.basis_unit))</span>
-                    <input
-                        id="food-amount"
-                        name="amount"
-                        type="number"
-                        inputmode="decimal"
-                        min="0.001"
-                        max="100000"
-                        step="any"
-                        required="true"
-                        value=(preview.amount)
-                        hx-get=(preview_url(preview.id, preview.date))
-                        hx-trigger="input changed delay:100ms"
-                        hx-target="#food-preview"
-                        hx-swap="outerHTML"
-                        hx-sync="this:replace"
-                        class="w-full rounded-lg border border-gray-300 bg-form px-3 py-2 text-base text-gray-1000 outline-none focus:border-gray-500 focus:ring-1 focus:ring-gray-400"
+                <div class="mb-4 flex items-end gap-2">
+                    <label for="food-amount" class="min-w-0 flex-1 text-sm text-gray-700">
+                        <span class="mb-1 block">"Amount in " (unit_name(&preview.basis_unit))</span>
+                        <input
+                            id="food-amount"
+                            name="amount"
+                            type="number"
+                            inputmode="decimal"
+                            min="0.001"
+                            max="100000"
+                            step="any"
+                            required="true"
+                            value=(preview.amount)
+                            hx-get=(preview_url(preview.id, preview.date))
+                            hx-trigger="input changed delay:100ms"
+                            hx-target="#food-preview"
+                            hx-swap="outerHTML"
+                            hx-sync="this:replace"
+                            class="w-full rounded-lg border border-gray-300 bg-form px-3 py-2 text-base text-gray-1000 outline-none focus:border-gray-500 focus:ring-1 focus:ring-gray-400"
+                        >
+                    </label>
+                    <button
+                        type="submit"
+                        formmethod="get"
+                        formaction="/"
+                        class="rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-800 hover:bg-gray-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-700"
                     >
-                </label>
-                <button type="submit" class="rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-800 hover:bg-gray-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-700">
-                    "Preview"
-                </button>
-            </form>
+                        "Preview"
+                    </button>
+                </div>
 
-            <div class="grid grid-cols-3 gap-2 border-y border-gray-200 py-3">
+                <div class="grid grid-cols-3 gap-2 border-y border-gray-200 py-3">
                 <p>
                     <span class="block text-xs text-gray-500">"Energy"</span>
                     <strong class="text-sm font-medium tabular-nums">(format_optional(energy)) " kcal"</strong>
@@ -556,21 +1149,55 @@ async fn food_preview(preview: &FoodPreview) -> Result {
                 nutrient_summary(preview: preview, code: "carbohydrate", label: "Carbs")
                 nutrient_summary(preview: preview, code: "fat", label: "Fat")
                 nutrient_summary(preview: preview, code: "fibre", label: "Fibre")
-            </div>
+                </div>
 
-            <details class="mt-2">
-                <summary class="cursor-pointer py-2 text-sm text-gray-600">"All nutrients"</summary>
-                <dl class="divide-y divide-gray-200">
-                    for nutrient in &preview.nutrients {
-                        <div class="flex justify-between gap-4 py-1.5 text-sm">
-                            <dt class="text-gray-600">(&nutrient.name)</dt>
-                            <dd class="shrink-0 tabular-nums text-gray-900">(format_nutrient(nutrient))</dd>
-                        </div>
-                    }
-                </dl>
-            </details>
+                <details class="mt-2">
+                    <summary class="cursor-pointer py-2 text-sm text-gray-600">"All nutrients"</summary>
+                    <dl class="divide-y divide-gray-200">
+                        for nutrient in &preview.nutrients {
+                            <div class="flex justify-between gap-4 py-1.5 text-sm">
+                                <dt class="text-gray-600">(&nutrient.name)</dt>
+                                <dd class="shrink-0 tabular-nums text-gray-900">(format_nutrient(nutrient))</dd>
+                            </div>
+                        }
+                    </dl>
+                </details>
 
-            <p class="mt-3 text-xs text-gray-500">"Preview only — nothing will be saved."</p>
+                <div class="mt-4 grid gap-3 sm:grid-cols-2">
+                    <label class="text-sm text-gray-700">
+                        <span class="mb-1 block">"Meal"</span>
+                        <select name="meal" class="w-full rounded-lg border border-gray-300 bg-form px-3 py-2 text-base text-gray-1000 outline-none focus:border-gray-500 focus:ring-1 focus:ring-gray-400">
+                            <option value="new" selected=(preview.latest_meal.as_ref().is_none_or(|meal| !meal.active))>"Start a new meal"</option>
+                            if let Some(meal) = &preview.latest_meal {
+                                <option value=(meal.id.to_string()) selected=(meal.active)>
+                                    "Continue " (meal_name(meal.name.as_deref())) " · " (&meal.local_time)
+                                </option>
+                            }
+                        </select>
+                    </label>
+                    <label class="text-sm text-gray-700">
+                        <span class="mb-1 block">"New meal name (optional)"</span>
+                        <input
+                            name="meal_name"
+                            list="meal-name-suggestions"
+                            maxlength="100"
+                            autocomplete="off"
+                            placeholder="Meal"
+                            class="w-full rounded-lg border border-gray-300 bg-form px-3 py-2 text-base text-gray-1000 outline-none placeholder:text-gray-500 focus:border-gray-500 focus:ring-1 focus:ring-gray-400"
+                        >
+                    </label>
+                </div>
+                <datalist id="meal-name-suggestions">
+                    <option value="Breakfast"></option>
+                    <option value="Lunch"></option>
+                    <option value="Dinner"></option>
+                    <option value="Snack"></option>
+                </datalist>
+
+                <button type="submit" class="mt-4 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-800 hover:bg-gray-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-700">
+                    "Log food"
+                </button>
+            </form>
         </div>
     }
 }
@@ -603,8 +1230,32 @@ fn unit_name(unit: &str) -> &str {
     match unit {
         "g" => "grams",
         "ml" => "millilitres",
-        "count" => "count",
+        "count" => "items",
         _ => unit,
+    }
+}
+
+fn entry_unit(unit: &str) -> &str {
+    match unit {
+        "count" => "items",
+        _ => unit,
+    }
+}
+
+fn meal_name(name: Option<&str>) -> &str {
+    name.unwrap_or("Meal")
+}
+
+fn total_text(total: &NutrientTotal, unit: &str) -> String {
+    let incomplete = if total.complete { "" } else { "*" };
+    format!("{}{} {}", format_number(total.value), incomplete, unit)
+}
+
+fn format_amount(value: f64) -> String {
+    if value.fract().abs() < f64::EPSILON {
+        format!("{value:.0}")
+    } else {
+        format_number(value)
     }
 }
 
@@ -613,7 +1264,9 @@ fn format_optional(value: Option<f64>) -> String {
 }
 
 fn format_number(value: f64) -> String {
-    if value >= 100.0 {
+    if value == 0.0 {
+        "0".to_owned()
+    } else if value >= 100.0 {
         format!("{value:.0}")
     } else if value >= 10.0 {
         format!("{value:.1}")

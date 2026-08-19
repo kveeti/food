@@ -188,9 +188,21 @@ CREATE TABLE IF NOT EXISTS food_shortcuts (
 CREATE UNIQUE INDEX IF NOT EXISTS food_shortcuts_name_idx
     ON food_shortcuts(user_id, food_id, lower(name));
 
+CREATE TABLE IF NOT EXISTS meals (
+    id         UUID PRIMARY KEY DEFAULT uuidv7(),
+    user_id    UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    name       TEXT CHECK (name IS NULL OR btrim(name) <> ''),
+    started_at TIMESTAMPTZ NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS meals_user_started_idx
+    ON meals(user_id, started_at DESC);
+
 CREATE TABLE IF NOT EXISTS food_entries (
     id                    UUID PRIMARY KEY DEFAULT uuidv7(),
     user_id               UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    meal_id               UUID REFERENCES meals(id) ON DELETE SET NULL,
     food_id               UUID REFERENCES foods(id) ON DELETE SET NULL,
     amount                DOUBLE PRECISION NOT NULL
                           CHECK (amount > 0 AND amount < 'Infinity'::double precision),
@@ -200,12 +212,15 @@ CREATE TABLE IF NOT EXISTS food_entries (
     food_brand            TEXT,
     food_source           TEXT NOT NULL CHECK (food_source IN ('fineli', 'open_food_facts', 'custom')),
     food_source_id        TEXT,
-    food_basis_unit       TEXT NOT NULL CHECK (food_basis_unit IN ('g', 'ml', 'count')),
     created_at            TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+ALTER TABLE food_entries
+    ADD COLUMN IF NOT EXISTS meal_id UUID REFERENCES meals(id) ON DELETE SET NULL;
+ALTER TABLE food_entries DROP COLUMN IF EXISTS food_basis_unit;
 CREATE INDEX IF NOT EXISTS food_entries_user_eaten_idx
     ON food_entries(user_id, eaten_at DESC);
 CREATE INDEX IF NOT EXISTS food_entries_food_idx ON food_entries(food_id);
+CREATE INDEX IF NOT EXISTS food_entries_meal_idx ON food_entries(meal_id);
 
 CREATE TABLE IF NOT EXISTS food_entry_nutrients (
     food_entry_id  UUID NOT NULL REFERENCES food_entries(id) ON DELETE CASCADE,

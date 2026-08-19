@@ -96,7 +96,7 @@ async fn home(cx: &Cx) -> Result {
     let user = auth::require_user(cx).await?;
     let timezone = user.timezone.ok_or_redirect("/settings?required=1")?;
     let day = day::Day::from_request(cx, db(cx), &timezone).await?;
-    let food = food::home_state(cx, user.id, day.date).await?;
+    let food = food::home_state(cx, user.id, day.date, &timezone).await?;
     let water = water::load(db(cx), user.id, day.date, &timezone).await?;
 
     view! {
