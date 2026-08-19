@@ -41,8 +41,10 @@ A meal groups food entries. Its kind is breakfast, lunch, dinner, or snack.
 The meal link is optional. A food entry stays valid and visible when its meal is
 missing. Empty meals are hidden.
 
-A recent meal may be continued for up to two hours. The person can always start
-a new meal. The app does not guess the meal kind from the time.
+When logging food, the app automatically selects the most recent meal whose
+latest entry is no more than two hours old. The selected meal stays visible and
+the person can choose another meal or start a new one. The app does not guess
+the meal kind from the time.
 
 ## Recipe
 
