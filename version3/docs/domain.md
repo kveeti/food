@@ -36,10 +36,13 @@ Changing a food does not rewrite old entries.
 
 ## Meal
 
-A meal groups food entries. Its kind is breakfast, lunch, dinner, or snack.
+A meal groups food entries. It may use the standard kind breakfast, lunch,
+dinner, or snack and may have a custom name. Both are optional, so a meal can
+start without forcing a label. The standard kinds are quick labels, not a
+required schedule.
 
 The meal link is optional. A food entry stays valid and visible when its meal is
-missing. Empty meals are hidden.
+missing. A meal is created with its first food, so empty meals are not stored.
 
 When logging food, the app automatically selects the most recent meal whose
 latest entry is no more than two hours old. The selected meal stays visible. A
