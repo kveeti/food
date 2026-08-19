@@ -5,7 +5,7 @@
 1. Start typing a food name.
 2. Select the first result with Enter or tap another result.
 3. Enter the amount.
-4. Choose the meal kind only when starting a meal.
+4. Optionally name a new meal. The picker suggests common names but accepts any text.
 5. Save.
 
 The search receives focus again so another food can be logged at once.
