@@ -12,7 +12,7 @@ use crate::{
     auth,
     day::{self, day_navigation},
     db,
-    food::{self, food_search},
+    food::{self, FOOD_JS, food_search},
     pwa::APP_ICON_192,
     settings::SETTINGS_JS,
     water::{self, water_section},
@@ -55,6 +55,7 @@ async fn root_layout(slot: Result) -> Result {
                 <script defer="true" src=(asset!("https://cdn.jsdelivr.net/npm/htmx.org@4.0.0-beta6/dist/htmx.min.js"))></script>
                 <script defer="true" src=(asset!("public/hx-optimistic.js"))></script>
                 <script defer="true" src=(SETTINGS_JS)></script>
+                <script defer="true" src=(FOOD_JS)></script>
                 <script defer="true" src=(asset!("public/register-service-worker.js"))></script>
             </head>
 

@@ -12,8 +12,18 @@ test("food search previews scaled nutrients", async ({ page }, testInfo) => {
   await result.click();
 
   await expect(page.getByRole("heading", { name: "SOKERI" })).toBeVisible();
-  await page.getByRole("spinbutton", { name: "Amount in grams" }).fill("50");
+  const amount = page.getByRole("spinbutton", { name: "Amount in grams" });
+  await amount.fill("");
+  await expect(amount).toBeFocused();
+  await expect(page.getByText("Nutrition per 100 g", { exact: true })).toBeVisible();
+  await expect(page.locator("#food-nutrition").getByText("406 kcal", { exact: true })).toBeVisible();
+  const energyDetail = page.locator('[data-nutrient-detail][data-unit="kJ"]');
+  await expect(energyDetail).toHaveText("1698 kJ");
+  await amount.fill("50");
+  await expect(amount).toBeFocused();
+  await expect(page.getByText("Nutrition for 50 g", { exact: true })).toBeVisible();
   await expect(page.getByText("203 kcal", { exact: true })).toBeVisible();
+  await expect(energyDetail).toHaveText("849 kJ");
   await expect(page.getByRole("button", { name: "Log food" })).toBeVisible();
 
   await page.getByRole("searchbox", { name: "Search foods" }).fill("nekta");
@@ -150,9 +160,8 @@ test("food search, preview, and logging work without JavaScript", async ({ brows
   await page.getByRole("button", { name: "Search", exact: true }).click();
   await page.getByRole("link", { name: /SOKERI/ }).click();
   await page.getByRole("spinbutton", { name: "Amount in grams" }).fill("50");
-  await page.getByRole("button", { name: "Preview", exact: true }).click();
-
-  await expect(page.getByText("203 kcal", { exact: true })).toBeVisible();
+  await expect(page.getByText("Nutrition per 100 g", { exact: true })).toBeVisible();
+  await expect(page.locator("#food-nutrition").getByText("406 kcal", { exact: true })).toBeVisible();
   await page.getByLabel("New meal name (optional)").fill("Breakfast");
   await page.getByRole("button", { name: "Log food" }).click();
   await expect(page.getByLabel("Food energy total")).toHaveText("203 kcal");

@@ -2,6 +2,7 @@ use chrono::{DateTime, NaiveDate, Utc};
 use sqlx::{PgPool, types::Uuid};
 use topcoat::{
     Result,
+    asset::{Asset, asset},
     context::Cx,
     router::{
         HeaderValue, IntoResponse, Response, RouterBuilder, StatusCode,
@@ -13,6 +14,8 @@ use topcoat::{
 };
 
 use crate::{auth, day::Day, db, ui::search_spinner};
+
+pub const FOOD_JS: Asset = asset!("public/food.js");
 
 pub fn register(builder: RouterBuilder) -> RouterBuilder {
     builder
@@ -527,18 +530,13 @@ async fn load_preview(
         return Err(not_found().into());
     };
     let amount = amount.unwrap_or(if first.3 == "count" { 1.0 } else { 100.0 });
-    let factor = if first.3 == "count" {
-        amount
-    } else {
-        amount / 100.0
-    };
     let nutrients = rows
         .iter()
         .map(|row| NutrientValue {
             code: row.4.clone(),
             name: row.5.clone(),
             unit: row.6.clone(),
-            value: row.7 * factor,
+            value: row.7,
         })
         .collect();
 
@@ -1018,7 +1016,7 @@ async fn food_entry(entry: &FoodEntry, date: NaiveDate) -> Result {
                                 name="amount"
                                 type="number"
                                 inputmode="decimal"
-                                min="0.001"
+                                min="0"
                                 max="100000"
                                 step="any"
                                 required="true"
@@ -1090,11 +1088,11 @@ fn preview_url(food_id: Uuid, date: NaiveDate) -> String {
 
 #[topcoat::view::component]
 async fn food_preview(preview: &FoodPreview) -> Result {
-    let energy = preview
-        .nutrients
-        .iter()
-        .find(|nutrient| nutrient.code == "energy")
-        .map(|nutrient| nutrient.value / 4.184);
+    let energy = nutrient_value(preview, "energy").map(|value| value / 4.184);
+    let protein = nutrient_value(preview, "protein");
+    let carbohydrate = nutrient_value(preview, "carbohydrate");
+    let fat = nutrient_value(preview, "fat");
+    let fibre = nutrient_value(preview, "fibre");
 
     view! {
         <div id="food-preview" class="mt-5 rounded-xl border border-gray-200 p-4">
@@ -1109,46 +1107,44 @@ async fn food_preview(preview: &FoodPreview) -> Result {
             <form method="post" action=(format!("/foods/{}/entries", preview.id))>
                 <input type="hidden" name="food" value=(preview.id.to_string())>
                 <input type="hidden" name="date" value=(preview.date.to_string())>
-                <div class="mb-4 flex items-end gap-2">
-                    <label for="food-amount" class="min-w-0 flex-1 text-sm text-gray-700">
-                        <span class="mb-1 block">"Amount in " (unit_name(&preview.basis_unit))</span>
-                        <input
-                            id="food-amount"
-                            name="amount"
-                            type="number"
-                            inputmode="decimal"
-                            min="0.001"
-                            max="100000"
-                            step="any"
-                            required="true"
-                            value=(preview.amount)
-                            hx-get=(preview_url(preview.id, preview.date))
-                            hx-trigger="input changed delay:100ms"
-                            hx-target="#food-preview"
-                            hx-swap="outerHTML"
-                            hx-sync="this:replace"
-                            class="w-full rounded-lg border border-gray-300 bg-form px-3 py-2 text-base text-gray-1000 outline-none focus:border-gray-500 focus:ring-1 focus:ring-gray-400"
-                        >
-                    </label>
-                    <button
-                        type="submit"
-                        formmethod="get"
-                        formaction="/"
-                        class="rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-800 hover:bg-gray-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-700"
+                <label for="food-amount" class="mb-4 block text-sm text-gray-700">
+                    <span class="mb-1 block">"Amount in " (unit_name(&preview.basis_unit))</span>
+                    <input
+                        id="food-amount"
+                        name="amount"
+                        type="number"
+                        inputmode="decimal"
+                        min="0"
+                        max="100000"
+                        step="any"
+                        required="true"
+                        value=(preview.amount)
+                        class="w-full rounded-lg border border-gray-300 bg-form px-3 py-2 text-base text-gray-1000 outline-none focus:border-gray-500 focus:ring-1 focus:ring-gray-400"
                     >
-                        "Preview"
-                    </button>
-                </div>
+                </label>
 
-                <div class="grid grid-cols-3 gap-2 border-y border-gray-200 py-3">
-                <p>
-                    <span class="block text-xs text-gray-500">"Energy"</span>
-                    <strong class="text-sm font-medium tabular-nums">(format_optional(energy)) " kcal"</strong>
-                </p>
-                nutrient_summary(preview: preview, code: "protein", label: "Protein")
-                nutrient_summary(preview: preview, code: "carbohydrate", label: "Carbs")
-                nutrient_summary(preview: preview, code: "fat", label: "Fat")
-                nutrient_summary(preview: preview, code: "fibre", label: "Fibre")
+                <div
+                    id="food-nutrition"
+                    data-basis-unit=(&preview.basis_unit)
+                    data-energy=(data_value(energy))
+                    data-protein=(data_value(protein))
+                    data-carbohydrate=(data_value(carbohydrate))
+                    data-fat=(data_value(fat))
+                    data-fibre=(data_value(fibre))
+                >
+                    <p data-nutrition-label="true" class="mb-2 text-xs font-medium text-gray-600">
+                        "Nutrition " (basis_name(&preview.basis_unit))
+                    </p>
+                    <div class="grid grid-cols-3 gap-2 border-y border-gray-200 py-3">
+                        <p>
+                            <span class="block text-xs text-gray-500">"Energy"</span>
+                            <strong data-nutrition="energy" class="text-sm font-medium tabular-nums">(format_optional(energy)) " kcal"</strong>
+                        </p>
+                        nutrient_summary(preview: preview, code: "protein", label: "Protein")
+                        nutrient_summary(preview: preview, code: "carbohydrate", label: "Carbs")
+                        nutrient_summary(preview: preview, code: "fat", label: "Fat")
+                        nutrient_summary(preview: preview, code: "fibre", label: "Fibre")
+                    </div>
                 </div>
 
                 <details class="mt-2">
@@ -1157,7 +1153,14 @@ async fn food_preview(preview: &FoodPreview) -> Result {
                         for nutrient in &preview.nutrients {
                             <div class="flex justify-between gap-4 py-1.5 text-sm">
                                 <dt class="text-gray-600">(&nutrient.name)</dt>
-                                <dd class="shrink-0 tabular-nums text-gray-900">(format_nutrient(nutrient))</dd>
+                                <dd
+                                    data-nutrient-detail="true"
+                                    data-basis-value=(nutrient.value)
+                                    data-unit=(&nutrient.unit)
+                                    class="shrink-0 tabular-nums text-gray-900"
+                                >
+                                    (format_nutrient(nutrient))
+                                </dd>
                             </div>
                         }
                     </dl>
@@ -1202,17 +1205,25 @@ async fn food_preview(preview: &FoodPreview) -> Result {
     }
 }
 
-#[topcoat::view::component]
-async fn nutrient_summary(preview: &FoodPreview, code: &str, label: &str) -> Result {
-    let value = preview
+fn nutrient_value(preview: &FoodPreview, code: &str) -> Option<f64> {
+    preview
         .nutrients
         .iter()
         .find(|nutrient| nutrient.code == code)
-        .map(|nutrient| nutrient.value);
+        .map(|nutrient| nutrient.value)
+}
+
+fn data_value(value: Option<f64>) -> String {
+    value.map(|value| value.to_string()).unwrap_or_default()
+}
+
+#[topcoat::view::component]
+async fn nutrient_summary(preview: &FoodPreview, code: &str, label: &str) -> Result {
+    let value = nutrient_value(preview, code);
     view! {
         <p>
             <span class="block text-xs text-gray-500">(label)</span>
-            <strong class="text-sm font-medium tabular-nums">(format_optional(value)) " g"</strong>
+            <strong data-nutrition=(code) class="text-sm font-medium tabular-nums">(format_optional(value)) " g"</strong>
         </p>
     }
 }
@@ -1223,6 +1234,15 @@ fn source_name(source: &str) -> &str {
         "open_food_facts" => "Open Food Facts",
         "custom" => "Custom",
         _ => source,
+    }
+}
+
+fn basis_name(unit: &str) -> &str {
+    match unit {
+        "g" => "per 100 g",
+        "ml" => "per 100 ml",
+        "count" => "per item",
+        _ => unit,
     }
 }
 
