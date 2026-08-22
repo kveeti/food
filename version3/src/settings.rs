@@ -12,7 +12,11 @@ use topcoat::{
     view::view,
 };
 
-use crate::{auth, db, ui::search_spinner};
+use crate::{
+    auth,
+    components::{button, search_spinner},
+    db,
+};
 
 pub const SETTINGS_JS: Asset = asset!("public/settings.js");
 
@@ -128,7 +132,7 @@ async fn settings(cx: &Cx) -> Result {
                             hx-swap="innerHTML"
                             hx-sync="closest form:replace"
                             hx-indicator="#timezone-search"
-                            class="relative min-w-23 rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-800 hover:bg-gray-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-700"
+                            class=(format!("relative min-w-23 {}", button::OUTLINE))
                         >
                             <span class="search-label">"Search"</span>
                             search_spinner()
@@ -142,7 +146,7 @@ async fn settings(cx: &Cx) -> Result {
 
                     <button
                         type="submit"
-                        class="rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-800 hover:bg-gray-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-700"
+                        class=(button::OUTLINE)
                     >
                         "Save"
                     </button>

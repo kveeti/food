@@ -12,7 +12,7 @@ use crate::{
     auth,
     day::{self, day_navigation},
     db,
-    food::{self, FOOD_JS, food_search},
+    food::{self, FOOD_JS, food_section},
     pwa::APP_ICON_192,
     settings::SETTINGS_JS,
     water::{self, water_section},
@@ -104,7 +104,7 @@ async fn home(cx: &Cx) -> Result {
         <main class="mx-auto w-full max-w-(--page-width) px-3 pb-[calc(var(--nav-height)+2rem)] pt-6 sm:px-6 sm:pb-12 sm:pt-10">
             day_navigation(day: &day)
 
-            food_search(day: &day, food: &food)
+            food_section(day: &day, food: &food)
 
             water_section(day: &day, water: &water)
         </main>

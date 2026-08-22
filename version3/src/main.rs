@@ -1,11 +1,11 @@
 mod app;
 mod auth;
+mod components;
 mod day;
 mod dev_oidc;
 mod food;
 mod pwa;
 mod settings;
-mod ui;
 mod water;
 
 use std::time::Duration;
