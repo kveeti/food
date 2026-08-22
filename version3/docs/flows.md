@@ -12,12 +12,12 @@ The search receives focus again so another food can be logged at once.
 
 ## Repeat a meal
 
-1. Search or open recent meals.
-2. Choose a meal.
-3. Remove any foods that are not wanted.
-4. Add the rest together.
+1. Search for a meal or use its copy control.
+2. Uncheck foods that are not wanted and adjust amounts.
+3. Copy the selected foods together.
 
-Foods already in the current meal are not added twice.
+Copying always starts a new meal with the source meal's name and current food
+definitions. Unavailable foods cannot be selected.
 
 ## Add water
 

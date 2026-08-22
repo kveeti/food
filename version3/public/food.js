@@ -48,7 +48,45 @@
         }
     }
 
+    function setMealEntrySelected(entry, selected) {
+        entry.checked = selected;
+        entry.closest("li").querySelector('input[type="number"]').disabled = !selected;
+    }
+
+    function updateSelectAll(form) {
+        const selectAll = form.querySelector("[data-select-all]");
+        const entries = [...form.querySelectorAll("[data-meal-entry]:not(:disabled)")];
+        const selected = entries.filter((entry) => entry.checked).length;
+        selectAll.disabled = entries.length === 0;
+        selectAll.checked = entries.length > 0 && selected === entries.length;
+        selectAll.indeterminate = selected > 0 && selected < entries.length;
+    }
+
+    function showMealStageControls(root) {
+        for (const control of root.querySelectorAll?.("[data-select-all-control]") ?? []) {
+            control.hidden = false;
+            updateSelectAll(control.closest("[data-meal-stage]"));
+        }
+    }
+
     document.addEventListener("input", (event) => {
         if (event.target.matches?.("#food-amount")) updateNutrition(event.target);
     });
+    document.addEventListener("change", (event) => {
+        const form = event.target.closest?.("[data-meal-stage]");
+        if (!form) return;
+
+        if (event.target.matches("[data-select-all]")) {
+            for (const entry of form.querySelectorAll("[data-meal-entry]:not(:disabled)")) {
+                setMealEntrySelected(entry, event.target.checked);
+            }
+        } else if (event.target.matches("[data-meal-entry]")) {
+            setMealEntrySelected(event.target, event.target.checked);
+        } else {
+            return;
+        }
+        updateSelectAll(form);
+    });
+    document.addEventListener("DOMContentLoaded", () => showMealStageControls(document));
+    document.addEventListener("htmx:after:process", (event) => showMealStageControls(event.target));
 })();

@@ -123,6 +123,44 @@ test("a new meal becomes the only meal that can be continued", async ({ page }, 
   await page.getByRole("button", { name: "Log food" }).click();
   await expect(page.getByText("* Incomplete", { exact: true })).toBeVisible();
 
+  const copyLunch = page.getByRole("link", { name: "Copy Lunch meal" });
+  await expect(copyLunch).toBeVisible();
+  await expect(page.getByRole("link", { name: "Copy Snack meal" })).toBeVisible();
+  await copyLunch.click();
+  await expect(page).toHaveURL(/meal_preview=/);
+  const copiedMeal = page.locator("#food-preview");
+  await expect(copiedMeal.getByRole("heading", { name: "New meal" })).toBeVisible();
+  await expect(copiedMeal.getByLabel("Meal name")).toHaveValue("Lunch");
+  await expect(copiedMeal).toBeInViewport();
+  const copiedAmount = copiedMeal.getByRole("spinbutton", {
+    name: "Amount for SOKERI in grams",
+  });
+  await expect(copiedAmount).toHaveValue("100");
+  await copiedAmount.fill("75");
+  await expect(copiedAmount).toHaveValue("75");
+  const includeSugar = copiedMeal.getByRole("checkbox", { name: "SOKERI" });
+  const selectAll = copiedMeal.getByRole("checkbox", { name: "Select all" });
+  await expect(selectAll).toBeChecked();
+  await selectAll.uncheck();
+  await expect(includeSugar).not.toBeChecked();
+  await expect(copiedAmount).toBeDisabled();
+  await selectAll.check();
+  await expect(includeSugar).toBeChecked();
+  await expect(copiedAmount).toBeEnabled();
+  await includeSugar.uncheck();
+  await expect(selectAll).not.toBeChecked();
+  await expect(copiedAmount).toBeDisabled();
+  await selectAll.check();
+  await expect(copiedAmount).toBeEnabled();
+  const cancelRequest = page.waitForRequest((request) => {
+    const url = new URL(request.url());
+    return url.pathname === "/" && !url.searchParams.has("meal_preview");
+  });
+  await copiedMeal.getByRole("link", { name: "Cancel" }).click();
+  expect((await cancelRequest).headers()["hx-request"]).toBe("true");
+  await expect(page).not.toHaveURL(/meal_preview=/);
+  await expect(page.locator("#food-preview")).toBeEmpty();
+
   await page.getByRole("searchbox", { name: "Search foods" }).fill("sugar");
   await page.getByRole("link", { name: /SOKERI/ }).click();
   const meal = page.locator('select[name="meal"]');
@@ -131,6 +169,31 @@ test("a new meal becomes the only meal that can be continued", async ({ page }, 
     /Continue Snack ·/,
   ]);
   await expect(meal).not.toContainText("Continue Lunch");
+
+  const search = page.getByRole("searchbox", { name: "Search foods" });
+  await search.fill("Lunch");
+  const lunch = page.locator('#food-results a[data-result-type="meal"]', {
+    hasText: "Lunch",
+  });
+  await expect(lunch).toHaveCount(1);
+
+  await search.fill("SOKERI");
+  await expect(page.locator('#food-results a[data-result-type="meal"]')).toHaveCount(1);
+  await lunch.click();
+  const preview = page.locator("#food-preview");
+  await expect(preview.getByRole("heading", { name: "New meal" })).toBeVisible();
+  const copiedMealName = preview.getByLabel("Meal name");
+  await expect(copiedMealName).toHaveValue("Lunch");
+  await copiedMealName.fill("Second lunch");
+  await expect(preview.getByText("SOKERI", { exact: true })).toBeVisible();
+  await expect(preview.getByRole("link", { name: "Cancel" })).toBeVisible();
+  await preview.getByRole("spinbutton", { name: "Amount for SOKERI in grams" }).fill("75");
+  await preview.getByRole("button", { name: "Add meal" }).click();
+  await expect(page.getByLabel("Food energy total")).toHaveText("754 kcal");
+  await expect(page.getByRole("heading", { name: /^Lunch ·/ })).toHaveCount(1);
+  await expect(page.getByRole("heading", { name: /^Second lunch ·/ })).toBeVisible();
+  await expect(page.getByText("SOKERI", { exact: true })).toHaveCount(2);
+  await expect(page.getByText(/^Continuing Second lunch ·/)).toBeVisible();
 });
 
 test("food entries stay private to their owner", async ({ page }, testInfo) => {
@@ -166,5 +229,15 @@ test("food search, preview, and logging work without JavaScript", async ({ brows
   await page.getByRole("button", { name: "Log food" }).click();
   await expect(page.getByLabel("Food energy total")).toHaveText("203 kcal");
   await expect(page.getByRole("heading", { name: /^Breakfast ·/ })).toBeVisible();
+  await page.getByRole("link", { name: "Copy Breakfast meal" }).click();
+  const mealPreview = page.locator("#food-preview");
+  await expect(mealPreview.getByRole("heading", { name: "New meal" })).toBeVisible();
+  await expect(mealPreview.getByLabel("Meal name")).toHaveValue("Breakfast");
+  await expect(mealPreview.getByRole("spinbutton", { name: "Amount for SOKERI in grams" })).toHaveValue("50");
+  await expect(mealPreview.getByRole("checkbox", { name: "Select all" })).toHaveCount(0);
+  await expect(mealPreview.getByRole("link", { name: "Cancel" })).toBeVisible();
+  await mealPreview.getByRole("button", { name: "Add meal" }).click();
+  await expect(page.getByLabel("Food energy total")).toHaveText("406 kcal");
+  await expect(page.getByRole("heading", { name: /^Breakfast ·/ })).toHaveCount(2);
   await context.close();
 });
