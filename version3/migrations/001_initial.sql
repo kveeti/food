@@ -66,10 +66,13 @@ CREATE INDEX IF NOT EXISTS nutrient_goals_nutrient_idx
 CREATE TABLE IF NOT EXISTS nutrient_source_keys (
     source       TEXT NOT NULL CHECK (source IN ('fineli', 'open_food_facts')),
     source_key   TEXT NOT NULL,
+    source_name  TEXT NOT NULL DEFAULT '',
     nutrient_id  UUID NOT NULL REFERENCES nutrients(id) ON DELETE RESTRICT,
     source_unit  TEXT NOT NULL,
     PRIMARY KEY (source, source_key)
 );
+ALTER TABLE nutrient_source_keys
+    ADD COLUMN IF NOT EXISTS source_name TEXT NOT NULL DEFAULT '';
 CREATE INDEX IF NOT EXISTS nutrient_source_keys_nutrient_idx
     ON nutrient_source_keys(nutrient_id);
 

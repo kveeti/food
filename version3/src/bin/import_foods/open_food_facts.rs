@@ -3,8 +3,9 @@ use std::{collections::BTreeMap, error::Error, io, io::Read};
 use csv::{ReaderBuilder, StringRecord};
 use serde_json::{Map, Value};
 
-use super::model::{
-    Alias, Food, FoodImport, NutrientDef, SOURCE_OFF, SourceMapping, data_error, nutrient_order,
+use super::{
+    model::{Alias, Food, FoodImport, SOURCE_OFF, SourceMapping, data_error},
+    nutrients::{definition, off_code},
 };
 
 pub fn read_open_food_facts(reader: impl Read) -> Result<FoodImport, Box<dyn Error>> {
@@ -28,20 +29,24 @@ pub fn read_open_food_facts(reader: impl Read) -> Result<FoodImport, Box<dyn Err
         .collect::<Vec<_>>();
     let mut nutrients = BTreeMap::new();
     let mut mappings = BTreeMap::new();
-    for (index, (_, source_key, nutrient)) in nutrient_columns.iter().enumerate() {
+    for (_, source_key, nutrient) in &nutrient_columns {
+        let definition = definition(&nutrient.code)
+            .ok_or_else(|| data_error(format!("unknown canonical nutrient {}", nutrient.code)))?;
+        if definition.unit != nutrient.unit {
+            return Err(data_error(format!(
+                "OFF nutrient {source_key} uses {}, expected {}",
+                nutrient.unit, definition.unit
+            ))
+            .into());
+        }
         nutrients
             .entry(nutrient.code.to_owned())
-            .or_insert_with(|| NutrientDef {
-                code: nutrient.code.to_owned(),
-                display_name: nutrient.display_name.clone(),
-                unit: nutrient.unit.to_owned(),
-                category: nutrient.category.to_owned(),
-                display_order: nutrient_order(&nutrient.code, index as i32),
-            });
+            .or_insert(definition);
         mappings.insert(
             (*source_key).to_owned(),
             SourceMapping {
                 source_key: (*source_key).to_owned(),
+                source_name: (*source_key).to_owned(),
                 nutrient_code: nutrient.code.to_owned(),
                 source_unit: nutrient.source_unit.to_owned(),
             },
@@ -149,10 +154,8 @@ fn header_index(headers: &StringRecord, name: &str) -> Result<usize, io::Error> 
 
 struct OffNutrient {
     code: String,
-    display_name: String,
     unit: &'static str,
     source_unit: &'static str,
-    category: &'static str,
     factor: f64,
 }
 
@@ -172,7 +175,7 @@ fn off_nutrient(header: &str) -> Option<OffNutrient> {
         return None;
     }
 
-    let (code, unit, source_unit, factor) = match key {
+    let (source_code, unit, source_unit, factor) = match key {
         "energy-kj" | "energy" => ("energy", "kJ", "kJ", 1.0),
         "energy-kcal" => ("energy", "kJ", "kcal", 4.184),
         "energy-from-fat" => ("energy-from-fat", "kJ", "kJ", 1.0),
@@ -185,75 +188,13 @@ fn off_nutrient(header: &str) -> Option<OffNutrient> {
         "vitamin-b9" | "folates" => ("folate", "g", "g", 1.0),
         other => (other, "g", "g", 1.0),
     };
-    let category = nutrient_category(code);
+    let code = off_code(source_code)?;
     Some(OffNutrient {
         code: code.to_owned(),
-        display_name: display_name(code),
         unit,
         source_unit,
-        category,
         factor,
     })
-}
-
-fn display_name(code: &str) -> String {
-    let mut name = code.replace('-', " ");
-    if let Some(first) = name.get_mut(0..1) {
-        first.make_ascii_uppercase();
-    }
-    name
-}
-
-fn nutrient_category(code: &str) -> &'static str {
-    if code == "energy" || code == "energy-from-fat" {
-        "energy"
-    } else if code.starts_with("vitamin")
-        || matches!(
-            code,
-            "thiamin" | "riboflavin" | "niacin" | "folate" | "biotin"
-        )
-    {
-        "vitamin"
-    } else if matches!(
-        code,
-        "potassium"
-            | "chloride"
-            | "calcium"
-            | "phosphorus"
-            | "iron"
-            | "magnesium"
-            | "zinc"
-            | "copper"
-            | "manganese"
-            | "fluoride"
-            | "selenium"
-            | "chromium"
-            | "molybdenum"
-            | "iodine"
-            | "sodium"
-            | "salt"
-            | "sulphate"
-            | "nitrate"
-    ) {
-        "mineral"
-    } else if code.contains("fat") || code.contains("acid") || code == "cholesterol" {
-        "fat"
-    } else if matches!(
-        code,
-        "protein"
-            | "carbohydrate"
-            | "fibre"
-            | "sugars"
-            | "starch"
-            | "polyols"
-            | "alcohol"
-            | "water"
-            | "ash"
-    ) {
-        "macro"
-    } else {
-        "other"
-    }
 }
 
 #[cfg(test)]
@@ -275,5 +216,10 @@ mod tests {
         assert!((food.nutrients["energy"] - 418.4).abs() < 0.000_001);
         assert_eq!(food.nutrients["protein"], 2.0);
         assert_eq!(food.nutrients["vitamin-c"], 0.003);
+        assert_eq!(import.nutrients["protein"].display_name, "Protein");
+        assert_eq!(
+            import.mappings["proteins_100g"].source_name,
+            "proteins_100g"
+        );
     }
 }

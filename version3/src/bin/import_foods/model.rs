@@ -17,6 +17,7 @@ pub struct NutrientDef {
 #[derive(Debug, Clone)]
 pub struct SourceMapping {
     pub source_key: String,
+    pub source_name: String,
     pub nutrient_code: String,
     pub source_unit: String,
 }
@@ -47,19 +48,4 @@ pub struct FoodImport {
 
 pub fn data_error(message: impl Into<String>) -> io::Error {
     io::Error::new(io::ErrorKind::InvalidData, message.into())
-}
-
-pub fn nutrient_order(code: &str, fallback: i32) -> i32 {
-    match code {
-        "energy" => 0,
-        "fat" => 10,
-        "saturated-fat" => 11,
-        "carbohydrate" => 20,
-        "sugars" => 21,
-        "fibre" => 30,
-        "protein" => 40,
-        "salt" => 50,
-        "sodium" => 51,
-        _ => 1000 + fallback,
-    }
 }

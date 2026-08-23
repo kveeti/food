@@ -9,8 +9,9 @@ use csv::{ReaderBuilder, StringRecord};
 use encoding_rs::WINDOWS_1252;
 use serde_json::{Map, Value, json};
 
-use super::model::{
-    Alias, Food, FoodImport, NutrientDef, SOURCE_FINELI, SourceMapping, data_error, nutrient_order,
+use super::{
+    model::{Alias, Food, FoodImport, SOURCE_FINELI, SourceMapping, data_error},
+    nutrients::{definition, fineli_code},
 };
 
 pub fn read_fineli(directory: &Path) -> Result<FoodImport, Box<dyn Error>> {
@@ -20,28 +21,32 @@ pub fn read_fineli(directory: &Path) -> Result<FoodImport, Box<dyn Error>> {
     let mut mappings = BTreeMap::new();
     let mut component_info = HashMap::new();
 
-    for (index, row) in component_rows.rows.iter().enumerate() {
+    for row in &component_rows.rows {
         let source_key = field(&component_rows.headers, row, "EUFDNAME")?;
         let source_unit = field(&component_rows.headers, row, "COMPUNIT")?;
-        let canonical = fineli_code(source_key);
+        let Some(canonical) = fineli_code(source_key) else {
+            continue;
+        };
         let (unit, factor) = fineli_unit(source_unit)?;
-        let display_name = component_names
+        let definition = definition(canonical)
+            .ok_or_else(|| data_error(format!("unknown canonical nutrient {canonical}")))?;
+        if definition.unit != unit {
+            return Err(data_error(format!(
+                "Fineli nutrient {source_key} uses {unit}, expected {}",
+                definition.unit
+            ))
+            .into());
+        }
+        let source_name = component_names
             .get(source_key)
             .cloned()
             .unwrap_or_else(|| source_key.to_owned());
-        let category = field(&component_rows.headers, row, "CMPCLASSP")?.to_lowercase();
-        let definition = NutrientDef {
-            code: canonical.to_owned(),
-            display_name,
-            unit: unit.to_owned(),
-            category,
-            display_order: nutrient_order(canonical, index as i32),
-        };
         nutrients.entry(canonical.to_owned()).or_insert(definition);
         mappings.insert(
             source_key.to_owned(),
             SourceMapping {
                 source_key: source_key.to_owned(),
+                source_name,
                 nutrient_code: canonical.to_owned(),
                 source_unit: source_unit.to_owned(),
             },
@@ -125,7 +130,7 @@ pub fn read_fineli(directory: &Path) -> Result<FoodImport, Box<dyn Error>> {
             continue;
         }
         let Some((canonical, factor)) = component_info.get(source_key) else {
-            return Err(data_error(format!("unknown Fineli component {source_key}")).into());
+            continue;
         };
         let Some(food) = foods.get_mut(source_id) else {
             return Err(data_error(format!("unknown Fineli food {source_id}")).into());
@@ -261,85 +266,6 @@ fn fineli_unit(unit: &str) -> Result<(&'static str, f64), io::Error> {
         "MG" => Ok(("g", 0.001)),
         "UG" => Ok(("g", 0.000_001)),
         _ => Err(data_error(format!("unsupported Fineli unit {unit}"))),
-    }
-}
-
-fn fineli_code(code: &str) -> &str {
-    match code {
-        "ENERC" => "energy",
-        "FAT" => "fat",
-        "CHOAVL" => "carbohydrate",
-        "CHOCDF" => "carbohydrate-by-difference",
-        "PROT" => "protein",
-        "ALC" => "alcohol",
-        "ASH" => "ash",
-        "WATER" => "water",
-        "OA" => "organic-acids",
-        "SUGOH" => "polyols",
-        "SUGAR" => "sugars",
-        "FRUS" => "fructose",
-        "GALS" => "galactose",
-        "GLUS" => "glucose",
-        "LACS" => "lactose",
-        "MALS" => "maltose",
-        "SUCS" => "sucrose",
-        "STARCH" => "starch",
-        "FIBC" => "fibre",
-        "FIBT" => "dietary-fibre",
-        "FIBINS" => "insoluble-fibre",
-        "FOL" => "folate",
-        "NIAEQ" => "niacin-equivalents",
-        "NIA" => "niacin",
-        "VITPYRID" => "vitamin-b6",
-        "RIBF" => "riboflavin",
-        "THIA" => "thiamin",
-        "VITA" => "vitamin-a",
-        "RETOL" => "retinol",
-        "CAROTENS" => "carotenoids",
-        "CARTB" => "beta-carotene",
-        "VITB12" => "vitamin-b12",
-        "VITC" => "vitamin-c",
-        "VITD" => "vitamin-d",
-        "VITE" => "vitamin-e",
-        "VITK" => "vitamin-k",
-        "CA" => "calcium",
-        "CR" => "chromium",
-        "CU" => "copper",
-        "FD" => "fluoride",
-        "FE" => "iron",
-        "ID" => "iodine",
-        "K" => "potassium",
-        "MG" => "magnesium",
-        "MN" => "manganese",
-        "MO" => "molybdenum",
-        "NA" => "sodium",
-        "NACL" => "salt",
-        "NT" => "nitrogen",
-        "P" => "phosphorus",
-        "SE" => "selenium",
-        "ZN" => "zinc",
-        "FAFRE" => "fatty-acids",
-        "FACIDCTG" => "fatty-acids-tag-equivalent",
-        "FAPU" => "polyunsaturated-fat",
-        "FAMCIS" => "monounsaturated-fat",
-        "FASAT" => "saturated-fat",
-        "FATRN" => "trans-fat",
-        "FAPUN3" => "omega-3-fat",
-        "FAPUN6" => "omega-6-fat",
-        "FAS18" => "stearic-acid",
-        "F16D0T" => "palmitic-acid",
-        "F18D1T" => "fatty-acid-18-1",
-        "F18D2CN6" => "linoleic-acid",
-        "F18D3N3" => "alpha-linolenic-acid",
-        "F20D4N6" => "arachidonic-acid",
-        "F20D5N3" => "eicosapentaenoic-acid",
-        "F22D6N3" => "docosahexaenoic-acid",
-        "CHOLE" => "cholesterol",
-        "STERT" => "sterols",
-        "TRP" => "tryptophan",
-        "MYRIC" => "myricetin",
-        "QUERCE" => "quercetin",
-        _ => code,
     }
 }
 

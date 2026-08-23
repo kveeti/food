@@ -42,7 +42,10 @@ pub async fn write_import(
         "INSERT INTO nutrients (code, display_name, unit, category, display_order)
          SELECT * FROM UNNEST($1::text[], $2::text[], $3::text[], $4::text[], $5::int4[])
          ON CONFLICT (code) DO UPDATE SET
-             display_order = LEAST(nutrients.display_order, EXCLUDED.display_order),
+             display_name = EXCLUDED.display_name,
+             unit = EXCLUDED.unit,
+             category = EXCLUDED.category,
+             display_order = EXCLUDED.display_order,
              updated_at = now()",
     )
     .bind(&codes)
@@ -58,6 +61,10 @@ pub async fn write_import(
         .iter()
         .map(|mapping| mapping.source_key.clone())
         .collect::<Vec<_>>();
+    let mapping_names = mappings
+        .iter()
+        .map(|mapping| mapping.source_name.clone())
+        .collect::<Vec<_>>();
     let mapping_codes = mappings
         .iter()
         .map(|mapping| mapping.nutrient_code.clone())
@@ -67,17 +74,21 @@ pub async fn write_import(
         .map(|mapping| mapping.source_unit.clone())
         .collect::<Vec<_>>();
     sqlx::query(
-        "INSERT INTO nutrient_source_keys (source, source_key, nutrient_id, source_unit)
-         SELECT $1, input.source_key, nutrients.id, input.source_unit
-         FROM UNNEST($2::text[], $3::text[], $4::text[])
-              AS input(source_key, nutrient_code, source_unit)
+        "INSERT INTO nutrient_source_keys (
+             source, source_key, source_name, nutrient_id, source_unit
+         )
+         SELECT $1, input.source_key, input.source_name, nutrients.id, input.source_unit
+         FROM UNNEST($2::text[], $3::text[], $4::text[], $5::text[])
+              AS input(source_key, source_name, nutrient_code, source_unit)
          JOIN nutrients ON nutrients.code = input.nutrient_code
          ON CONFLICT (source, source_key) DO UPDATE SET
+             source_name = EXCLUDED.source_name,
              nutrient_id = EXCLUDED.nutrient_id,
              source_unit = EXCLUDED.source_unit",
     )
     .bind(source)
     .bind(&mapping_keys)
+    .bind(&mapping_names)
     .bind(&mapping_codes)
     .bind(&mapping_units)
     .execute(&mut *transaction)

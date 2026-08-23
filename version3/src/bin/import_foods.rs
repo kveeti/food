@@ -4,6 +4,8 @@ mod database;
 mod fineli;
 #[path = "import_foods/model.rs"]
 mod model;
+#[path = "import_foods/nutrients.rs"]
+mod nutrients;
 #[path = "import_foods/open_food_facts.rs"]
 mod open_food_facts;
 

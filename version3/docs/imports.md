@@ -4,6 +4,10 @@ Imports are repeatable upserts. Each run replaces aliases and nutrient values
 for its source, archives source records no longer present, and leaves diary
 snapshots untouched.
 
+Canonical nutrient codes, names, units, categories, and display order belong to
+the app. Importers map source fields to that registry and preserve each source's
+own label in `nutrient_source_keys.source_name`.
+
 Set `DATABASE_URL` before running either importer.
 
 ## Fineli
