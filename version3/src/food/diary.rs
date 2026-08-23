@@ -1,5 +1,5 @@
 use super::*;
-use crate::components::{button, input};
+use crate::components::{button, chevron_right, input};
 
 pub(super) fn register(builder: RouterBuilder) -> RouterBuilder {
     builder.route(update_entry).route(delete_entry)
@@ -303,10 +303,11 @@ async fn food_entry(entry: &FoodEntry, date: NaiveDate) -> Result {
         .energy_kcal
         .map(|value| format!("{} kcal", format_number(value)))
         .unwrap_or_else(|| "— kcal".to_owned());
+    let delete_dialog_id = format!("delete-food-entry-{}", entry.id);
 
     view! {
         <li class="border-t border-gray-200 first:border-t-0">
-            <details>
+            <details class="group">
                 <summary class="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 py-2">
                     <span class="min-w-0">
                         <span class="block truncate text-sm text-gray-900">(&entry.name)</span>
@@ -320,13 +321,19 @@ async fn food_entry(entry: &FoodEntry, date: NaiveDate) -> Result {
                             <span class="block">(energy)</span>
                         </span>
                         <time datetime=(entry.eaten_at.to_rfc3339())>(&entry.local_time)</time>
+                        chevron_right(class: "shrink-0 transition-transform group-open:rotate-90")
                     </span>
                 </summary>
-                <div class="flex items-end gap-2 pb-3">
-                    <form method="post" action=(format!("/food-entries/{}", entry.id)) class="flex min-w-0 flex-1 items-end gap-2">
+                <div class="flex items-stretch gap-2 pb-3">
+                    <form
+                        method="post"
+                        action=(format!("/food-entries/{}", entry.id))
+                        hx-boost="true"
+                        class="flex min-w-0 flex-1 items-stretch gap-2"
+                    >
                         <input type="hidden" name="date" value=(date.to_string())>
-                        <label class="min-w-0 flex-1 text-xs text-gray-600">
-                            <span class="mb-1 block">"Amount in " (unit_name(&entry.unit))</span>
+                        <label class="min-w-0 flex-1">
+                            <span class="sr-only">"Amount in " (unit_name(&entry.unit))</span>
                             <input
                                 name="amount"
                                 type="number"
@@ -339,22 +346,52 @@ async fn food_entry(entry: &FoodEntry, date: NaiveDate) -> Result {
                                 class=(input::FIELD)
                             >
                         </label>
-                        <button type="submit" class=(button::OUTLINE)>"Save"</button>
+                        <button type="submit" class=(format!("self-stretch {}", button::OUTLINE))>"Save"</button>
                     </form>
-                    <form method="post" action=(format!("/food-entries/{}/delete", entry.id))>
-                        <input type="hidden" name="date" value=(date.to_string())>
-                        <button
-                            type="submit"
-                            aria-label=(format!("Delete {}", entry.name))
-                            class="grid size-9 place-items-center rounded-lg border border-gray-200 text-gray-500 hover:bg-danger-surface hover:text-danger-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-text"
-                        >
-                            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" class="size-4">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"></path>
-                            </svg>
-                        </button>
-                    </form>
+                    <button
+                        type="button"
+                        commandfor=(&delete_dialog_id)
+                        command="show-modal"
+                        aria-label=(format!("Delete {}", entry.name))
+                        class="grid w-11 place-items-center rounded-lg border border-gray-200 text-gray-500 hover:bg-danger-surface hover:text-danger-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-text"
+                    >
+                        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" class="size-4">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
                 </div>
             </details>
+
+            <dialog
+                id=(&delete_dialog_id)
+                aria-labelledby=(format!("{delete_dialog_id}-title"))
+                class="food-delete-dialog w-[calc(100%_-_1.5rem)] max-w-sm rounded-xl border border-gray-200 bg-canvas p-0 text-gray-950 shadow-xl"
+            >
+                <div class="p-4">
+                    <h2 id=(format!("{delete_dialog_id}-title")) class="text-base font-semibold text-gray-1000">"Delete food?"</h2>
+                    <p class="mt-1 text-sm text-gray-600">"Remove " (&entry.name) " from this meal?"</p>
+                    <div class="mt-5 flex justify-end gap-2">
+                        <form method="dialog" data-close-dialog-form="true">
+                            <button type="submit" class=(button::GHOST)>"No, cancel"</button>
+                        </form>
+                        <form
+                            method="post"
+                            action=(format!("/food-entries/{}/delete", entry.id))
+                            hx-boost="true"
+                            data-delete-dialog-form="true"
+                        >
+                            <input type="hidden" name="date" value=(date.to_string())>
+                            <button
+                                type="submit"
+                                class="rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-800 hover:bg-danger-surface hover:text-danger-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-text"
+                            >
+                                "Yes, delete"
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </dialog>
+            <div aria-hidden="true" class="food-delete-backdrop"></div>
         </li>
     }
 }

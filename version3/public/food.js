@@ -1,4 +1,31 @@
 (() => {
+    const closingDialogs = new WeakMap();
+
+    function closeDialog(dialog) {
+        if (!dialog?.open) return Promise.resolve();
+        const current = closingDialogs.get(dialog);
+        if (current) return current;
+
+        const closing = (async () => {
+            if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+                dialog.classList.add("is-closing");
+                void dialog.offsetWidth;
+                const backdrop = dialog.nextElementSibling;
+                const animations = [
+                    ...dialog.getAnimations(),
+                    ...(backdrop?.getAnimations() ?? []),
+                ];
+                await Promise.allSettled(animations.map((animation) => animation.finished));
+            }
+
+            if (dialog.open) dialog.close();
+            dialog.classList.remove("is-closing");
+        })();
+        closingDialogs.set(dialog, closing);
+        closing.finally(() => closingDialogs.delete(dialog));
+        return closing;
+    }
+
     function formatNumber(value) {
         if (value === 0) return "0";
         if (value >= 100) return value.toFixed(0);
@@ -69,6 +96,29 @@
         }
     }
 
+    document.addEventListener("submit", async (event) => {
+        const closeForm = event.target.closest?.("[data-close-dialog-form]");
+        const deleteForm = event.target.closest?.("[data-delete-dialog-form]");
+        if (!closeForm && (!deleteForm || !window.htmx)) return;
+        if (deleteForm?.dataset.dialogSubmitReady) {
+            delete deleteForm.dataset.dialogSubmitReady;
+            return;
+        }
+
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        const submitter = event.submitter;
+        await closeDialog(event.target.closest("dialog"));
+        if (deleteForm) {
+            deleteForm.dataset.dialogSubmitReady = "true";
+            deleteForm.requestSubmit(submitter);
+        }
+    }, true);
+    document.addEventListener("cancel", (event) => {
+        if (!event.target.matches?.(".food-delete-dialog")) return;
+        event.preventDefault();
+        closeDialog(event.target);
+    }, true);
     document.addEventListener("input", (event) => {
         if (event.target.matches?.("#food-amount")) updateNutrition(event.target);
     });

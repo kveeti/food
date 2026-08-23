@@ -86,7 +86,12 @@ test("food logging snapshots nutrients and continues the active meal", async ({ 
   await expect(page.getByRole("heading", { name: /^Lunch ·/ })).toBeVisible();
   await page.getByText("SOKERI", { exact: true }).click();
   await page.getByRole("spinbutton", { name: "Amount in grams" }).fill("100");
+  const saveRequestPromise = page.waitForRequest((request) =>
+    new URL(request.url()).pathname.startsWith("/food-entries/"),
+  );
   await page.getByRole("button", { name: "Save", exact: true }).click();
+  const saveRequest = await saveRequestPromise;
+  expect(saveRequest.headers()["hx-request"]).toBe("true");
   await expect(page.getByLabel("Food energy total")).toHaveText("406 kcal");
 
   await page.getByRole("searchbox", { name: "Search foods" }).fill("sugar");
@@ -101,9 +106,23 @@ test("food logging snapshots nutrients and continues the active meal", async ({ 
 
   await page.getByText("SOKERI", { exact: true }).last().click();
   await page.getByRole("button", { name: "Delete SOKERI" }).last().click();
+  let deleteDialog = page.getByRole("dialog", { name: "Delete food?" });
+  await expect(deleteDialog).toBeVisible();
+  await deleteDialog.getByRole("button", { name: "No, cancel" }).click();
+  await expect(deleteDialog).not.toBeVisible();
+  await page.getByRole("button", { name: "Delete SOKERI" }).last().click();
+  await expect(deleteDialog).toBeVisible();
+  const deleteRequestPromise = page.waitForRequest((request) =>
+    new URL(request.url()).pathname.endsWith("/delete"),
+  );
+  await deleteDialog.getByRole("button", { name: "Yes, delete" }).click();
+  const deleteRequest = await deleteRequestPromise;
+  expect(deleteRequest.headers()["hx-request"]).toBe("true");
   await expect(page.getByLabel("Food energy total")).toHaveText("406 kcal");
   await page.getByText("SOKERI", { exact: true }).click();
   await page.getByRole("button", { name: "Delete SOKERI" }).click();
+  deleteDialog = page.getByRole("dialog", { name: "Delete food?" });
+  await deleteDialog.getByRole("button", { name: "Yes, delete" }).click();
   await expect(page.getByLabel("Food energy total")).toHaveText("0 kcal");
   await expect(page.getByText("No food logged")).toBeVisible();
 });
@@ -239,5 +258,17 @@ test("food search, preview, and logging work without JavaScript", async ({ brows
   await mealPreview.getByRole("button", { name: "Add meal" }).click();
   await expect(page.getByLabel("Food energy total")).toHaveText("406 kcal");
   await expect(page.getByRole("heading", { name: /^Breakfast ·/ })).toHaveCount(2);
+
+  await page.getByText("SOKERI", { exact: true }).first().click();
+  await page.getByRole("button", { name: "Delete SOKERI" }).click();
+  const deleteDialog = page.getByRole("dialog", { name: "Delete food?" });
+  await expect(deleteDialog).toHaveCSS("opacity", "1");
+  await deleteDialog.getByRole("button", { name: "No, cancel" }).click();
+  await expect(deleteDialog).not.toBeVisible();
+  await page.getByRole("button", { name: "Delete SOKERI" }).click();
+  await expect(deleteDialog).toHaveCSS("opacity", "1");
+  await deleteDialog.getByRole("button", { name: "Yes, delete" }).click();
+  await expect(page.getByText("SOKERI", { exact: true })).toHaveCount(1);
+
   await context.close();
 });
