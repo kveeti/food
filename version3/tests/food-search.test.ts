@@ -82,7 +82,7 @@ test("food logging snapshots nutrients and continues the active meal", async ({ 
   await page.getByLabel("New meal name (optional)").fill("Lunch");
   await page.getByRole("button", { name: "Log food" }).click();
 
-  await expect(page.getByLabel("Food energy total")).toHaveText("203 kcal");
+  await expect(page.getByLabel("Food energy progress")).toContainText("203 kcal / no goal");
   await expect(page.getByRole("heading", { name: /^Lunch ·/ })).toBeVisible();
   await page.getByText("SOKERI", { exact: true }).click();
   await page.getByRole("spinbutton", { name: "Amount in grams" }).fill("100");
@@ -92,7 +92,7 @@ test("food logging snapshots nutrients and continues the active meal", async ({ 
   await page.getByRole("button", { name: "Save", exact: true }).click();
   const saveRequest = await saveRequestPromise;
   expect(saveRequest.headers()["hx-request"]).toBe("true");
-  await expect(page.getByLabel("Food energy total")).toHaveText("406 kcal");
+  await expect(page.getByLabel("Food energy progress")).toContainText("406 kcal / no goal");
 
   await page.getByRole("searchbox", { name: "Search foods" }).fill("sugar");
   await page.getByRole("link", { name: /SOKERI/ }).click();
@@ -102,7 +102,7 @@ test("food logging snapshots nutrients and continues the active meal", async ({ 
 
   await expect(page.getByRole("heading", { name: /^Lunch ·/ })).toHaveCount(1);
   await expect(page.getByText("SOKERI", { exact: true })).toHaveCount(2);
-  await expect(page.getByLabel("Food energy total")).toHaveText("507 kcal");
+  await expect(page.getByLabel("Food energy progress")).toContainText("507 kcal / no goal");
 
   await page.getByText("SOKERI", { exact: true }).last().click();
   await page.getByRole("button", { name: "Delete SOKERI" }).last().click();
@@ -118,12 +118,12 @@ test("food logging snapshots nutrients and continues the active meal", async ({ 
   await deleteDialog.getByRole("button", { name: "Yes, delete" }).click();
   const deleteRequest = await deleteRequestPromise;
   expect(deleteRequest.headers()["hx-request"]).toBe("true");
-  await expect(page.getByLabel("Food energy total")).toHaveText("406 kcal");
+  await expect(page.getByLabel("Food energy progress")).toContainText("406 kcal / no goal");
   await page.getByText("SOKERI", { exact: true }).click();
   await page.getByRole("button", { name: "Delete SOKERI" }).click();
   deleteDialog = page.getByRole("dialog", { name: "Delete food?" });
   await deleteDialog.getByRole("button", { name: "Yes, delete" }).click();
-  await expect(page.getByLabel("Food energy total")).toHaveText("0 kcal");
+  await expect(page.getByLabel("Food energy progress")).toContainText("0 kcal / no goal");
   await expect(page.getByText("No food logged")).toBeVisible();
 });
 
@@ -140,7 +140,6 @@ test("a new meal becomes the only meal that can be continued", async ({ page }, 
   await page.locator('select[name="meal"]').selectOption("new");
   await page.getByLabel("New meal name (optional)").fill("Snack");
   await page.getByRole("button", { name: "Log food" }).click();
-  await expect(page.getByText("* Incomplete", { exact: true })).toBeVisible();
 
   const copyLunch = page.getByRole("link", { name: "Copy Lunch meal" });
   await expect(copyLunch).toBeVisible();
@@ -208,7 +207,7 @@ test("a new meal becomes the only meal that can be continued", async ({ page }, 
   await expect(preview.getByRole("link", { name: "Cancel" })).toBeVisible();
   await preview.getByRole("spinbutton", { name: "Amount for SOKERI in grams" }).fill("75");
   await preview.getByRole("button", { name: "Add meal" }).click();
-  await expect(page.getByLabel("Food energy total")).toHaveText("754 kcal");
+  await expect(page.getByLabel("Food energy progress")).toContainText("754 kcal / no goal");
   await expect(page.getByRole("heading", { name: /^Lunch ·/ })).toHaveCount(1);
   await expect(page.getByRole("heading", { name: /^Second lunch ·/ })).toBeVisible();
   await expect(page.getByText("SOKERI", { exact: true })).toHaveCount(2);
@@ -220,13 +219,13 @@ test("food entries stay private to their owner", async ({ page }, testInfo) => {
   await page.getByRole("searchbox", { name: "Search foods" }).fill("sugar");
   await page.getByRole("link", { name: /SOKERI/ }).click();
   await page.getByRole("button", { name: "Log food" }).click();
-  await expect(page.getByLabel("Food energy total")).toHaveText("406 kcal");
+  await expect(page.getByLabel("Food energy progress")).toContainText("406 kcal / no goal");
 
   await page.getByRole("button", { name: "log out" }).click();
   await page.getByPlaceholder("new-user-sub").fill(`food-private-other-${Date.now()}`);
   await page.getByRole("button", { name: "Log in", exact: true }).click();
   await chooseTimezone(page);
-  await expect(page.getByLabel("Food energy total")).toHaveText("0 kcal");
+  await expect(page.getByLabel("Food energy progress")).toContainText("0 kcal / no goal");
   await expect(page.getByText("SOKERI", { exact: true })).toHaveCount(0);
 });
 
@@ -246,7 +245,7 @@ test("food search, preview, and logging work without JavaScript", async ({ brows
   await expect(page.locator("#food-nutrition").getByText("406 kcal", { exact: true })).toBeVisible();
   await page.getByLabel("New meal name (optional)").fill("Breakfast");
   await page.getByRole("button", { name: "Log food" }).click();
-  await expect(page.getByLabel("Food energy total")).toHaveText("203 kcal");
+  await expect(page.getByLabel("Food energy progress")).toContainText("203 kcal / no goal");
   await expect(page.getByRole("heading", { name: /^Breakfast ·/ })).toBeVisible();
   await page.getByRole("link", { name: "Copy Breakfast meal" }).click();
   const mealPreview = page.locator("#food-preview");
@@ -256,7 +255,7 @@ test("food search, preview, and logging work without JavaScript", async ({ brows
   await expect(mealPreview.getByRole("checkbox", { name: "Select all" })).toHaveCount(0);
   await expect(mealPreview.getByRole("link", { name: "Cancel" })).toBeVisible();
   await mealPreview.getByRole("button", { name: "Add meal" }).click();
-  await expect(page.getByLabel("Food energy total")).toHaveText("406 kcal");
+  await expect(page.getByLabel("Food energy progress")).toContainText("406 kcal / no goal");
   await expect(page.getByRole("heading", { name: /^Breakfast ·/ })).toHaveCount(2);
 
   await page.getByText("SOKERI", { exact: true }).first().click();

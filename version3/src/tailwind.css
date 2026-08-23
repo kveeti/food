@@ -23,6 +23,13 @@
 
     --danger-surface: oklch(94% 0.025 25deg);
     --danger-text: oklch(45% 0.14 25deg);
+
+    --food-progress: oklch(95% 0.025 65deg);
+    --food-fill: oklch(81% 0.1 60deg);
+    --food-over: oklch(74% 0.11 60deg);
+    --water-progress: oklch(95% 0.02 235deg);
+    --water-fill: oklch(81% 0.075 235deg);
+    --water-over: oklch(74% 0.085 235deg);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -46,6 +53,13 @@
 
         --danger-surface: oklch(25% 0.04 25deg);
         --danger-text: oklch(75% 0.11 25deg);
+
+        --food-progress: oklch(23% 0.025 65deg);
+        --food-fill: oklch(42% 0.075 60deg);
+        --food-over: oklch(40% 0.065 60deg);
+        --water-progress: oklch(23% 0.02 235deg);
+        --water-fill: oklch(42% 0.06 235deg);
+        --water-over: oklch(40% 0.055 235deg);
     }
 }
 
@@ -77,6 +91,13 @@
 
     --color-danger-surface: var(--danger-surface);
     --color-danger-text: var(--danger-text);
+
+    --color-food-progress: var(--food-progress);
+    --color-food-fill: var(--food-fill);
+    --color-food-over: var(--food-over);
+    --color-water-progress: var(--water-progress);
+    --color-water-fill: var(--water-fill);
+    --color-water-over: var(--water-over);
 }
 
 html {

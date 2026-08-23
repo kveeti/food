@@ -15,7 +15,7 @@ use topcoat::{
 use crate::{
     auth,
     components::{button, search_spinner},
-    db,
+    db, goals,
 };
 
 pub const SETTINGS_JS: Asset = asset!("public/settings.js");
@@ -83,6 +83,15 @@ async fn settings(cx: &Cx) -> Result {
     let user = auth::require_user(cx).await?;
     let query = query_params::<SettingsQuery>(cx)?;
     let required = query.required.as_deref() == Some("1") && user.timezone.is_none();
+    let goal_settings = if let Some(timezone) = user.timezone.as_deref() {
+        let today = sqlx::query_scalar("SELECT (now() AT TIME ZONE $1)::date")
+            .bind(timezone)
+            .fetch_one(db(cx))
+            .await?;
+        Some(goals::load_settings(cx, user.id, today).await?)
+    } else {
+        None
+    };
     let timezone = user.timezone.unwrap_or_default();
 
     view! {
@@ -152,6 +161,10 @@ async fn settings(cx: &Cx) -> Result {
                     </button>
                 </form>
             </section>
+
+            if let Some(goals) = &goal_settings {
+                goals::goal_settings(goals: goals)
+            }
         </main>
     }
 }

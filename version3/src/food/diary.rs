@@ -10,6 +10,7 @@ pub(super) async fn load_day(
     user_id: Uuid,
     date: NaiveDate,
     timezone: &str,
+    goals: &DailyGoals,
 ) -> Result<(Vec<Meal>, DailyTotals)> {
     type EntryRow = (
         Uuid,
@@ -25,8 +26,21 @@ pub(super) async fn load_day(
         Option<f64>,
     );
 
-    let (entry_rows, total_rows): (Vec<EntryRow>, Vec<(String, f64, bool)>) =
-        tokio::try_join!(
+    let mut nutrient_codes = vec![
+        "energy".to_owned(),
+        "protein".to_owned(),
+        "carbohydrate".to_owned(),
+        "fat".to_owned(),
+        "fibre".to_owned(),
+    ];
+    for goal in &goals.nutrients {
+        if !nutrient_codes.contains(&goal.code) {
+            nutrient_codes.push(goal.code.clone());
+        }
+    }
+
+    type TotalRow = (String, String, String, f64, bool);
+    let (entry_rows, total_rows): (Vec<EntryRow>, Vec<TotalRow>) = tokio::try_join!(
             sqlx::query_as(
                 "SELECT entries.id, entries.meal_id, meals.name,
                         to_char(COALESCE(meals.started_at, entries.eaten_at) AT TIME ZONE $3, 'HH24:MI'),
@@ -57,7 +71,7 @@ pub(super) async fn load_day(
                        AND eaten_at >= ($2::date::timestamp AT TIME ZONE $3)
                        AND eaten_at < (($2::date + 1)::timestamp AT TIME ZONE $3)
                  )
-                 SELECT nutrients.code,
+                 SELECT nutrients.code, nutrients.display_name, nutrients.unit,
                         COALESCE(SUM(values.consumed_value), 0),
                         COUNT(values.food_entry_id) = (SELECT COUNT(*) FROM day_entries)
                  FROM nutrients
@@ -66,12 +80,12 @@ pub(super) async fn load_day(
                         ON values.food_entry_id = day_entries.id
                        AND values.nutrient_id = nutrients.id
                  WHERE nutrients.code = ANY($4)
-                 GROUP BY nutrients.id, nutrients.code",
+                 GROUP BY nutrients.id, nutrients.code, nutrients.display_name, nutrients.unit",
             )
             .bind(user_id)
             .bind(date)
             .bind(timezone)
-            .bind(["energy", "protein", "carbohydrate", "fat", "fibre"])
+            .bind(&nutrient_codes)
             .fetch_all(pool),
         )?;
 
@@ -108,16 +122,37 @@ pub(super) async fn load_day(
     let total = |code: &str, energy: bool| {
         let row = total_rows.iter().find(|row| row.0 == code);
         NutrientTotal {
-            value: row.map_or(0.0, |row| if energy { row.1 / 4.184 } else { row.1 }),
-            complete: row.is_none_or(|row| row.2),
+            value: row.map_or(0.0, |row| if energy { row.3 / 4.184 } else { row.3 }),
+            complete: row.is_none_or(|row| row.4),
         }
     };
+    let mut display_codes = vec!["protein", "carbohydrate", "fat", "fibre"];
+    for goal in &goals.nutrients {
+        if !display_codes.contains(&goal.code.as_str()) {
+            display_codes.push(&goal.code);
+        }
+    }
+    let nutrients = display_codes
+        .into_iter()
+        .filter_map(|code| {
+            let row = total_rows.iter().find(|row| row.0 == code)?;
+            let label = row.1.clone();
+            let goal = goals
+                .nutrients
+                .iter()
+                .find(|goal| goal.code == code)
+                .map(|goal| goal.target);
+            Some(DisplayedNutrientTotal {
+                label,
+                unit: row.2.clone(),
+                total: total(code, false),
+                goal,
+            })
+        })
+        .collect();
     let totals = DailyTotals {
         energy: total("energy", true),
-        protein: total("protein", false),
-        carbohydrate: total("carbohydrate", false),
-        fat: total("fat", false),
-        fibre: total("fibre", false),
+        nutrients,
     };
 
     Ok((meals, totals))
@@ -215,32 +250,36 @@ async fn delete_entry(cx: &Cx, Form(input): Form<DeleteEntryForm>) -> Result<Res
 
 #[topcoat::view::component]
 pub(super) async fn daily_totals(totals: &DailyTotals) -> Result {
-    let incomplete = !totals.energy.complete
-        || !totals.protein.complete
-        || !totals.carbohydrate.complete
-        || !totals.fat.complete
-        || !totals.fibre.complete;
-
     view! {
-        <div aria-label="Daily nutrition totals" class="mt-6 grid grid-cols-3 gap-x-3 gap-y-3 border-y border-gray-200 py-3">
-            daily_total(label: "Energy", total: &totals.energy, unit: "kcal")
-            daily_total(label: "Protein", total: &totals.protein, unit: "g")
-            daily_total(label: "Carbs", total: &totals.carbohydrate, unit: "g")
-            daily_total(label: "Fat", total: &totals.fat, unit: "g")
-            daily_total(label: "Fibre", total: &totals.fibre, unit: "g")
-            if incomplete {
-                <p class="self-end text-xs text-gray-500">"* Incomplete"</p>
+        <div aria-label="Daily nutrition totals" class="grid grid-cols-4 gap-x-3 gap-y-3 border-y border-gray-200 py-3">
+            for nutrient in &totals.nutrients {
+                daily_total(nutrient: nutrient)
             }
         </div>
     }
 }
 
 #[topcoat::view::component]
-async fn daily_total(label: &str, total: &NutrientTotal, unit: &str) -> Result {
+async fn daily_total(nutrient: &DisplayedNutrientTotal) -> Result {
+    let value = if let Some(goal) = nutrient.goal {
+        format!(
+            "{} / {} {}",
+            format_number(nutrient.total.value),
+            format_amount(goal),
+            nutrient.unit
+        )
+    } else {
+        format!(
+            "{} {} / no goal",
+            format_number(nutrient.total.value),
+            nutrient.unit
+        )
+    };
+
     view! {
         <p>
-            <span class="block text-xs text-gray-500">(label)</span>
-            <strong class="text-sm font-medium tabular-nums">(total_text(total, unit))</strong>
+            <span class="block truncate text-xs text-gray-500">(&nutrient.label)</span>
+            <strong class="text-sm font-medium tabular-nums">(value)</strong>
         </p>
     }
 }

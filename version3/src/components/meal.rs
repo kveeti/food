@@ -1,24 +1,26 @@
 use topcoat::{Result, view::view};
 
 use crate::{
-    components::input,
+    components::{input, select_control},
     food::{LatestMeal, meal_name},
 };
 
 #[topcoat::view::component]
 pub async fn meal_selector(latest_meal: Option<&LatestMeal>) -> Result {
+    let meal_options = view! {
+        <option value="new" selected=(latest_meal.is_none_or(|meal| !meal.active))>"Start a new meal"</option>
+        if let Some(meal) = latest_meal {
+            <option value=(meal.id.to_string()) selected=(meal.active)>
+                "Continue " (meal_name(meal.name.as_deref())) " · " (&meal.local_time)
+            </option>
+        }
+    };
+
     view! {
         <div class="mt-4 grid gap-3 sm:grid-cols-2">
             <label class="text-sm text-gray-700">
                 <span class="mb-1 block">"Meal"</span>
-                <select name="meal" class=(input::FIELD)>
-                    <option value="new" selected=(latest_meal.is_none_or(|meal| !meal.active))>"Start a new meal"</option>
-                    if let Some(meal) = latest_meal {
-                        <option value=(meal.id.to_string()) selected=(meal.active)>
-                            "Continue " (meal_name(meal.name.as_deref())) " · " (&meal.local_time)
-                        </option>
-                    }
-                </select>
+                select_control(name: "meal", options: meal_options)
             </label>
             <label class="text-sm text-gray-700">
                 <span class="mb-1 block">"New meal name (optional)"</span>

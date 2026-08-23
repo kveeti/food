@@ -115,16 +115,17 @@ Changing the profile does not rewrite recorded food, workouts, weight, or goals.
 
 ## Goals
 
-Calorie, protein, carbohydrate, fat, fibre, water, and weight goals start on a
-given date. A day uses the goals that apply to that date. A single day may have
-an override.
+Daily burn, food adjustment, water, nutrient, and weight goals start on a given
+date. A day uses the latest goal profile that starts on or before that date. No
+goals have default values.
+
+Protein, carbohydrate, fat, and fibre totals are always shown. Other nutrient
+totals are shown when the person sets a goal for them.
 
 Normal daily burn covers rest and ordinary movement but excludes separately
 logged workouts. It may be entered directly or estimated from the person's
-profile.
-
-An energy goal may include a desired deficit or surplus and whether workout
-energy changes the food target.
+profile. The food goal is daily burn plus a signed deficit or surplus. Logged
+workout energy may increase it later.
 
 ## Day
 

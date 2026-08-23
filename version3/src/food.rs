@@ -20,6 +20,7 @@ use crate::{
     components::{button, search_spinner},
     day::Day,
     db,
+    goals::DailyGoals,
 };
 
 mod diary;
@@ -130,12 +131,17 @@ struct NutrientTotal {
 }
 
 #[derive(Debug)]
+struct DisplayedNutrientTotal {
+    label: String,
+    unit: String,
+    total: NutrientTotal,
+    goal: Option<f64>,
+}
+
+#[derive(Debug)]
 struct DailyTotals {
     energy: NutrientTotal,
-    protein: NutrientTotal,
-    carbohydrate: NutrientTotal,
-    fat: NutrientTotal,
-    fibre: NutrientTotal,
+    nutrients: Vec<DisplayedNutrientTotal>,
 }
 
 #[derive(Debug)]
@@ -148,6 +154,12 @@ pub struct FoodHome {
     meals: Vec<Meal>,
     totals: DailyTotals,
     latest_meal: Option<LatestMeal>,
+}
+
+impl FoodHome {
+    pub fn energy_kcal(&self) -> (f64, bool) {
+        (self.totals.energy.value, self.totals.energy.complete)
+    }
 }
 
 #[topcoat::router::query_params(error = bad_request)]
@@ -163,13 +175,14 @@ pub async fn home_state(
     user_id: Uuid,
     date: NaiveDate,
     timezone: &str,
+    goals: &DailyGoals,
 ) -> Result<FoodHome> {
     let query = query_params::<HomeFoodQuery>(cx)?;
     let food_query = query.food_query.as_deref().unwrap_or_default().trim();
     let (results, meal_results, (meals, totals), latest_meal) = tokio::try_join!(
         search::search(db(cx), user_id, food_query),
         search::search_meals(db(cx), user_id, food_query, timezone),
-        diary::load_day(db(cx), user_id, date, timezone),
+        diary::load_day(db(cx), user_id, date, timezone, goals),
         meals::load_latest_meal(db(cx), user_id, date, timezone),
     )?;
     let preview = if let Some(food) = query.food.as_deref() {
@@ -241,15 +254,11 @@ fn redirect_to_day(cx: &Cx, date: NaiveDate) -> Result<Response> {
 
 #[topcoat::view::component]
 pub async fn food_section(day: &Day, food: &FoodHome) -> Result {
-    let energy_total = total_text(&food.totals.energy, "kcal");
-
     view! {
-        <section id="food-section" aria-labelledby="food-heading" class="mt-10">
-            <div class="mb-3 flex items-baseline justify-between gap-4">
-                <h2 id="food-heading" class="text-base font-medium text-gray-1000">"Food"</h2>
-                <span aria-label="Food energy total" class="text-sm font-medium tabular-nums text-gray-900">(energy_total)</span>
-            </div>
-            <form method="get" action="/" class="flex gap-2">
+        <section id="food-section" aria-label="Food" class="mt-8">
+            diary::daily_totals(totals: &food.totals)
+
+            <form method="get" action="/" class="mt-6 flex gap-2">
                 <input type="hidden" name="date" value=(day.date.to_string())>
                 <label for="food-query" class="sr-only">"Search foods"</label>
                 <input
@@ -305,7 +314,6 @@ pub async fn food_section(day: &Day, food: &FoodHome) -> Result {
                 <div id="food-preview" class="mt-5"></div>
             }
 
-            diary::daily_totals(totals: &food.totals)
             diary::food_diary(meals: &food.meals, date: day.date)
         </section>
     }
@@ -329,11 +337,6 @@ fn entry_unit(unit: &str) -> &str {
 
 pub(crate) fn meal_name(name: Option<&str>) -> &str {
     name.unwrap_or("Meal")
-}
-
-fn total_text(total: &NutrientTotal, unit: &str) -> String {
-    let incomplete = if total.complete { "" } else { "*" };
-    format!("{}{} {}", format_number(total.value), incomplete, unit)
 }
 
 fn format_amount(value: f64) -> String {

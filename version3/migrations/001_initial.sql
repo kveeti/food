@@ -38,6 +38,31 @@ CREATE TABLE IF NOT EXISTS nutrients (
     updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS goal_profiles (
+    id                       UUID PRIMARY KEY DEFAULT uuidv7(),
+    user_id                  UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    effective_from           DATE NOT NULL,
+    daily_burn_kcal          INTEGER CHECK (daily_burn_kcal > 0),
+    food_adjustment_kcal     INTEGER NOT NULL DEFAULT 0,
+    water_goal_ml            INTEGER CHECK (water_goal_ml > 0),
+    created_at               TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at               TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE (user_id, effective_from),
+    CHECK (daily_burn_kcal IS NOT NULL OR food_adjustment_kcal = 0),
+    CHECK (daily_burn_kcal IS NULL OR daily_burn_kcal + food_adjustment_kcal > 0)
+);
+CREATE INDEX IF NOT EXISTS goal_profiles_user_date_idx
+    ON goal_profiles(user_id, effective_from DESC);
+
+CREATE TABLE IF NOT EXISTS nutrient_goals (
+    goal_profile_id UUID NOT NULL REFERENCES goal_profiles(id) ON DELETE CASCADE,
+    nutrient_id     UUID NOT NULL REFERENCES nutrients(id) ON DELETE RESTRICT,
+    target_value    DOUBLE PRECISION NOT NULL CHECK (target_value > 0),
+    PRIMARY KEY (goal_profile_id, nutrient_id)
+);
+CREATE INDEX IF NOT EXISTS nutrient_goals_nutrient_idx
+    ON nutrient_goals(nutrient_id);
+
 CREATE TABLE IF NOT EXISTS nutrient_source_keys (
     source       TEXT NOT NULL CHECK (source IN ('fineli', 'open_food_facts')),
     source_key   TEXT NOT NULL,

@@ -4,6 +4,8 @@ import { chooseTimezone, ensureTimezone, login } from "./helpers";
 
 const waterTotal = (page: import("@playwright/test").Page) =>
   page.getByLabel("Water total");
+const waterProgress = (page: import("@playwright/test").Page) =>
+  page.getByLabel("Water progress");
 
 test("dev login moves to the configured host before setting cookies", async ({ page }) => {
   await page.goto("http://localhost:8200/");
@@ -90,15 +92,18 @@ test("water logging uses htmx and stays private to the user", async ({ page }) =
   await page.getByRole("link", { name: /alice@dev\.local/ }).click();
   await ensureTimezone(page);
   await expect(waterTotal(page)).toHaveText("0 ml");
+  await expect(waterProgress(page)).toContainText("0 ml / no goal");
 
   await page.getByRole("button", { name: "250 ml" }).click();
   await expect(waterTotal(page)).toHaveText("250 ml");
+  await expect(waterProgress(page)).toContainText("250 ml / no goal");
   await page.getByText("1 entry", { exact: true }).click();
   const history = page.locator("#water-history");
   await expect(page.getByRole("button", { name: "Delete 250 ml entry" })).toBeVisible();
   await page.getByRole("button", { name: "Delete 250 ml entry" }).click();
   await expect(history).toHaveAttribute("open", "");
   await expect(waterTotal(page)).toHaveText("0 ml");
+  await expect(waterProgress(page)).toContainText("0 ml / no goal");
 
   await page.getByRole("button", { name: "250 ml" }).click();
   await expect(waterTotal(page)).toHaveText("250 ml");
@@ -107,6 +112,66 @@ test("water logging uses htmx and stays private to the user", async ({ page }) =
   await ensureTimezone(page);
   await expect(waterTotal(page)).toHaveText("0 ml");
   await expect(page.getByRole("button", { name: "Delete 250 ml entry" })).toHaveCount(0);
+});
+
+test("goals apply from their starting date", async ({ page }, testInfo) => {
+  await login(page, testInfo);
+
+  await page.getByRole("link", { name: "settings" }).click();
+  await page.getByLabel("Baseline burn").fill("1800");
+  await expect(page.getByLabel("By")).toBeHidden();
+  await page.locator('select[name="adjustment_kind"]').selectOption("deficit");
+  await expect(page.getByLabel("By")).toBeVisible();
+  await page.getByLabel("By").fill("300");
+  await page.getByLabel("Water").fill("2000");
+  await page.getByLabel("Protein").fill("120");
+  await page.getByLabel("Nutrient").fill("Sugars");
+  await page.locator('input[name="add_nutrient_target"]').fill("50");
+  const saveGoalsRequestPromise = page.waitForRequest(
+    (request) => new URL(request.url()).pathname === "/settings/goals",
+  );
+  await page.getByRole("button", { name: "Save goals" }).click();
+  const saveGoalsRequest = await saveGoalsRequestPromise;
+  expect(saveGoalsRequest.headers()["hx-request"]).toBe("true");
+  await page.getByRole("link", { name: "today" }).click();
+
+  await expect(page.getByLabel("Food energy progress")).toContainText("1,500 kcal left");
+  await expect(page.getByLabel("Food energy progress")).toContainText("0 / 1,500 kcal");
+  await expect(waterProgress(page)).toContainText("2,000 ml left");
+  await expect(waterProgress(page)).toContainText("0 / 2,000 ml");
+  const nutrition = page.getByLabel("Daily nutrition totals");
+  await expect(nutrition.getByText("Protein").locator(".."))
+    .toContainText("0 / 120 g");
+  await expect(nutrition.getByText("Sugars").locator(".."))
+    .toContainText("0 / 50 g");
+
+  await page.getByRole("link", { name: "settings" }).click();
+  await page.getByLabel("Sugars").fill("0");
+  await page.getByRole("button", { name: "Save goals" }).click();
+  await page.getByRole("link", { name: "today" }).click();
+  await expect(page.getByLabel("Daily nutrition totals")).not.toContainText("Sugars");
+
+  await page.getByRole("link", { name: "Previous day" }).click();
+  await expect(page.getByLabel("Food energy progress")).toContainText("0 kcal / no goal");
+  await expect(waterProgress(page)).toContainText("0 ml / no goal");
+  await expect(page.getByLabel("Daily nutrition totals")).not.toContainText("Sugars");
+});
+
+test("water progress shows amounts over the goal", async ({ page }, testInfo) => {
+  await login(page, testInfo);
+
+  await page.getByRole("link", { name: "settings" }).click();
+  await page.locator('#goals input[name="water_goal_ml"]').fill("2000");
+  await page.getByRole("button", { name: "Save goals" }).click();
+  await page.getByRole("link", { name: "today" }).click();
+  await page.getByText("Other amount", { exact: true }).click();
+  await page.getByRole("spinbutton", { name: "Water in millilitres" }).fill("2250");
+  await page.getByRole("button", { name: "Add", exact: true }).click();
+
+  const progress = waterProgress(page);
+  await expect(progress).toContainText("250 ml over");
+  await expect(progress).toHaveAttribute("aria-valuemax", "2250");
+  await expect(progress.locator('[data-goal-over="true"]')).toBeVisible();
 });
 
 test("login and water forms work without JavaScript", async ({ browser }, testInfo) => {

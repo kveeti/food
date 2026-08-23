@@ -4,6 +4,7 @@ mod components;
 mod day;
 mod dev_oidc;
 mod food;
+mod goals;
 mod pwa;
 mod settings;
 mod water;
@@ -52,6 +53,7 @@ async fn main() {
     let builder = app::register(builder);
     let builder = auth::register(builder);
     let builder = food::register(builder);
+    let builder = goals::register(builder);
     let builder = pwa::register(builder);
     let builder = settings::register(builder);
     let builder = water::register(builder);

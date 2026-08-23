@@ -13,7 +13,7 @@ use topcoat::{
     view::view,
 };
 
-use crate::{auth, day::Day, db};
+use crate::{auth, components::water_progress, day::Day, db, goals};
 
 pub fn register(builder: RouterBuilder) -> RouterBuilder {
     builder.route(log_water).route(delete_water)
@@ -37,6 +37,12 @@ struct WaterEntry {
 pub struct WaterDay {
     entries: Vec<WaterEntry>,
     total: i64,
+}
+
+impl WaterDay {
+    pub fn total(&self) -> i64 {
+        self.total
+    }
 }
 
 pub async fn load(
@@ -220,12 +226,14 @@ async fn log_water(cx: &Cx, Form(input): Form<WaterForm>) -> Result<Response> {
     }
 
     let (count, total) = load_summary(db(cx), user.id, date, &timezone).await?;
+    let water_goal = goals::water_goal_for_date(cx, user.id, date).await?;
     let count_label = entry_count(count as usize);
     let fragment = view! {
         water_entry(entry: &entry, date: date)
         <span id="water-total-value" hx-swap-oob="outerHTML" class="font-medium text-gray-900">(total) " ml"</span>
         <span id="water-entry-count" hx-swap-oob="outerHTML">(count_label)</span>
         <li id="water-empty-state" hx-swap-oob="delete"></li>
+        water_progress(consumed: total, goal: water_goal, swap_oob: true)
     }?;
 
     fragment.into_response(cx)
@@ -257,9 +265,11 @@ async fn delete_water(cx: &Cx, Form(input): Form<DeleteForm>) -> Result<Response
     }
 
     let water = load(db(cx), user.id, date, &timezone).await?;
+    let water_goal = goals::water_goal_for_date(cx, user.id, date).await?;
     let fragment = view! {
         water_history(entries: &water.entries, date: date, open: true)
         <span id="water-total-value" hx-swap-oob="outerHTML" class="font-medium text-gray-900">(water.total) " ml"</span>
+        water_progress(consumed: water.total, goal: water_goal, swap_oob: true)
     }?;
 
     fragment.into_response(cx)
