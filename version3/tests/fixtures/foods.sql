@@ -2,10 +2,14 @@ INSERT INTO nutrients (code, display_name, unit, category, display_order)
 VALUES
     ('energy', 'Energy', 'kJ', 'energy', 0),
     ('fat', 'Fat', 'g', 'macro', 10),
-    ('carbohydrate', 'Carbohydrate', 'g', 'macro', 20),
+    ('carbohydrate', 'Carbs', 'g', 'macro', 20),
     ('sugars', 'Sugars', 'g', 'macro', 21),
+    ('carbohydrate-by-difference', 'Carbohydrate by difference', 'g', 'carbohydrate', 22),
     ('fibre', 'Fibre', 'g', 'macro', 30),
     ('protein', 'Protein', 'g', 'macro', 40);
+
+INSERT INTO nutrients (code, display_name, unit, category, display_order, is_archived)
+VALUES ('old-nutrient', 'Old nutrient', 'g', 'other', 1000, true);
 
 INSERT INTO foods (source, source_id, display_name, basis_unit, source_data)
 VALUES
@@ -63,6 +67,7 @@ CROSS JOIN (
         ('fat', 0),
         ('carbohydrate', 99.9),
         ('sugars', 99.8),
+        ('carbohydrate-by-difference', 99.88),
         ('fibre', 0),
         ('protein', 0)
 ) AS values(code, value)

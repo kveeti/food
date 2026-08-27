@@ -1,20 +1,12 @@
-#[path = "import_foods/database.rs"]
-mod database;
-#[path = "import_foods/fineli.rs"]
-mod fineli;
-#[path = "import_foods/model.rs"]
-mod model;
-#[path = "import_foods/nutrients.rs"]
-mod nutrients;
-#[path = "import_foods/open_food_facts.rs"]
-mod open_food_facts;
-
 use std::{env, error::Error, fs, io, path::Path};
 
-use database::write_import;
-use fineli::read_fineli;
-use open_food_facts::read_open_food_facts;
+use flate2::read::MultiGzDecoder;
 use sqlx::{Connection, PgConnection};
+use version3::imports::{
+    database::{write_delta, write_import},
+    fineli::read_fineli,
+    open_food_facts::{read_open_food_facts, read_open_food_facts_delta},
+};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -22,7 +14,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let kind = args
         .next()
         .ok_or_else(|| usage_error("missing import kind"))?;
-    let import = match kind.as_str() {
+    let (import, delta) = match kind.as_str() {
         "fineli" => {
             let path = args
                 .next()
@@ -30,18 +22,38 @@ async fn main() -> Result<(), Box<dyn Error>> {
             if args.next().is_some() {
                 return Err(usage_error("too many arguments").into());
             }
-            read_fineli(Path::new(&path))?
+            (read_fineli(Path::new(&path))?, None)
         }
-        "open-food-facts" => {
+        "open-food-facts" | "open-food-facts-gzip" | "open-food-facts-delta-gzip" => {
+            let compressed = kind != "open-food-facts";
+            let is_delta = kind == "open-food-facts-delta-gzip";
             let path = args.next().unwrap_or_else(|| "-".to_owned());
             if args.next().is_some() {
                 return Err(usage_error("too many arguments").into());
             }
-            if path == "-" {
+            if is_delta {
+                let delta = if path == "-" {
+                    let stdin = io::stdin();
+                    read_open_food_facts_delta(MultiGzDecoder::new(stdin.lock()))?
+                } else {
+                    read_open_food_facts_delta(MultiGzDecoder::new(fs::File::open(path)?))?
+                };
+                (delta.import, Some(delta.changed_source_ids))
+            } else if path == "-" {
                 let stdin = io::stdin();
-                read_open_food_facts(stdin.lock())?
+                let import = if compressed {
+                    read_open_food_facts(MultiGzDecoder::new(stdin.lock()))?
+                } else {
+                    read_open_food_facts(stdin.lock())?
+                };
+                (import, None)
             } else {
-                read_open_food_facts(fs::File::open(path)?)?
+                let import = if compressed {
+                    read_open_food_facts(MultiGzDecoder::new(fs::File::open(path)?))?
+                } else {
+                    read_open_food_facts(fs::File::open(path)?)?
+                };
+                (import, None)
             }
         }
         _ => return Err(usage_error("unknown import kind").into()),
@@ -53,7 +65,18 @@ async fn main() -> Result<(), Box<dyn Error>> {
     sqlx::raw_sql(include_str!("../../migrations/001_initial.sql"))
         .execute(&mut connection)
         .await?;
-    write_import(&mut connection, import).await?;
+    if let Some(changed_source_ids) = delta {
+        write_delta(
+            &mut connection,
+            version3::imports::model::FoodDelta {
+                import,
+                changed_source_ids,
+            },
+        )
+        .await?;
+    } else {
+        write_import(&mut connection, import).await?;
+    }
 
     Ok(())
 }
@@ -62,7 +85,7 @@ fn usage_error(message: &str) -> io::Error {
     io::Error::new(
         io::ErrorKind::InvalidInput,
         format!(
-            "{message}\nusage:\n  import-foods fineli DIRECTORY\n  import-foods open-food-facts [TSV|-]"
+            "{message}\nusage:\n  import-foods fineli DIRECTORY\n  import-foods open-food-facts [JSONL|-]\n  import-foods open-food-facts-gzip [JSONL.GZ|-]\n  import-foods open-food-facts-delta-gzip [JSON.GZ|-]"
         ),
     )
 }

@@ -12,10 +12,64 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS timezone TEXT;
 CREATE TABLE IF NOT EXISTS sessions (
     token_hash BYTEA PRIMARY KEY,
     user_id    UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    is_admin   BOOLEAN NOT NULL DEFAULT false,
     expires_at TIMESTAMPTZ NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+ALTER TABLE sessions
+    ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL DEFAULT false;
 CREATE INDEX IF NOT EXISTS sessions_user_id_idx ON sessions(user_id);
+
+CREATE TABLE IF NOT EXISTS import_settings (
+    singleton            BOOLEAN PRIMARY KEY DEFAULT true CHECK (singleton),
+    off_full_url         TEXT NOT NULL,
+    off_delta_index_url  TEXT NOT NULL,
+    updated_at           TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+INSERT INTO import_settings (off_full_url, off_delta_index_url)
+VALUES (
+    'https://static.openfoodfacts.org/data/openfoodfacts-products.jsonl.gz',
+    'https://static.openfoodfacts.org/data/delta/index.txt'
+)
+ON CONFLICT (singleton) DO NOTHING;
+
+CREATE TABLE IF NOT EXISTS import_jobs (
+    id             UUID PRIMARY KEY DEFAULT uuidv7(),
+    kind           TEXT NOT NULL CHECK (kind IN (
+                       'fineli_upload', 'off_full_upload', 'off_delta_upload',
+                       'off_full_sync', 'off_delta_sync'
+                   )),
+    status         TEXT NOT NULL DEFAULT 'queued' CHECK (status IN (
+                       'queued', 'running', 'succeeded', 'failed'
+                   )),
+    file_path      TEXT,
+    original_name  TEXT,
+    sha256         TEXT,
+    requested_by   UUID REFERENCES users(id) ON DELETE SET NULL,
+    delta_start    BIGINT,
+    delta_end      BIGINT,
+    details        TEXT,
+    error          TEXT,
+    created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+    started_at     TIMESTAMPTZ,
+    finished_at    TIMESTAMPTZ
+);
+ALTER TABLE import_jobs
+    ADD COLUMN IF NOT EXISTS sha256 TEXT;
+CREATE INDEX IF NOT EXISTS import_jobs_status_created_idx
+    ON import_jobs(status, created_at);
+CREATE UNIQUE INDEX IF NOT EXISTS import_jobs_active_kind_idx
+    ON import_jobs(kind) WHERE status IN ('queued', 'running')
+      AND kind IN ('off_full_sync', 'off_delta_sync');
+
+CREATE TABLE IF NOT EXISTS off_sync_state (
+    singleton       BOOLEAN PRIMARY KEY DEFAULT true CHECK (singleton),
+    last_delta_end  BIGINT,
+    last_full_at    TIMESTAMPTZ,
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+INSERT INTO off_sync_state DEFAULT VALUES
+ON CONFLICT (singleton) DO NOTHING;
 
 CREATE TABLE IF NOT EXISTS water_log (
     id          UUID PRIMARY KEY DEFAULT uuidv7(),
@@ -34,9 +88,13 @@ CREATE TABLE IF NOT EXISTS nutrients (
     unit          TEXT NOT NULL CHECK (unit IN ('g', 'kJ')),
     category      TEXT NOT NULL,
     display_order INTEGER NOT NULL DEFAULT 0,
+    is_archived   BOOLEAN NOT NULL DEFAULT false,
     created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+ALTER TABLE nutrients
+    ADD COLUMN IF NOT EXISTS is_archived BOOLEAN NOT NULL DEFAULT false;
 
 CREATE TABLE IF NOT EXISTS goal_profiles (
     id                       UUID PRIMARY KEY DEFAULT uuidv7(),

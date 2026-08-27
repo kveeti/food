@@ -90,9 +90,11 @@ are stored in sentence case while their exact source text remains in
 `source_data`. Its values are per 100 g.
 
 Open Food Facts is imported only for products tagged `en:finland` that have a
-barcode, a product name, and at least one supported numeric nutrient. The TSV
-export exposes `_100g` values, so these foods use a 100 g basis. The importer
-does not infer a 100 ml basis from a package, category, or serving description.
+barcode, a product name, an explicit `100g` or `100ml` nutrition basis, and at
+least one supported numeric nutrient. A modern as-sold aggregate supplies the
+basis and values. If it is absent, legacy `nutriments` and
+`nutrition_data_per` supply them. The importer does not infer a basis from a
+package, category, or serving description.
 
 Fineli and Open Food Facts records are not merged. Source updates change the
 current food definition while diary snapshots stay unchanged.

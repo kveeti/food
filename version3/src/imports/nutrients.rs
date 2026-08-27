@@ -24,7 +24,7 @@ const NUTRIENTS: &[Nutrient] = &[
     },
     Nutrient {
         code: "carbohydrate",
-        name: "Carbohydrate",
+        name: "Carbs",
         category: "macro",
     },
     Nutrient {
@@ -115,11 +115,6 @@ const NUTRIENTS: &[Nutrient] = &[
     Nutrient {
         code: "carbohydrate-by-difference",
         name: "Carbohydrate by difference",
-        category: "carbohydrate",
-    },
-    Nutrient {
-        code: "carbohydrates-total",
-        name: "Total carbohydrates",
         category: "carbohydrate",
     },
     Nutrient {
@@ -772,6 +767,7 @@ mod tests {
     #[test]
     fn owns_canonical_names() {
         assert_eq!(definition("protein").unwrap().display_name, "Protein");
+        assert_eq!(definition("carbohydrate").unwrap().display_name, "Carbs");
         assert_eq!(definition("fat").unwrap().display_name, "Fat");
         assert_eq!(fineli_code("PROT"), Some("protein"));
         assert_eq!(off_code("proteins"), Some("protein"));

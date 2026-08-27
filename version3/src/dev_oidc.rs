@@ -81,7 +81,7 @@ async fn discovery(cx: &Cx) -> Result<Json<serde_json::Value>> {
         "response_types_supported": ["code"],
         "subject_types_supported": ["public"],
         "id_token_signing_alg_values_supported": ["RS256"],
-        "scopes_supported": ["openid", "email"],
+        "scopes_supported": ["openid", "email", "groups"],
         "token_endpoint_auth_methods_supported": ["client_secret_post"],
         "code_challenge_methods_supported": ["S256"]
     })))
@@ -242,6 +242,11 @@ async fn token(cx: &Cx, Form(form): Form<TokenForm>) -> Result<Json<serde_json::
     }
 
     let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
+    let groups = if pending.subject == "alice" {
+        vec!["food-admin"]
+    } else {
+        Vec::new()
+    };
     let id_token = sign(
         provider,
         json!({
@@ -249,6 +254,7 @@ async fn token(cx: &Cx, Form(form): Form<TokenForm>) -> Result<Json<serde_json::
             "sub": pending.subject,
             "aud": provider.client_id,
             "email": pending.email,
+            "groups": groups,
             "nonce": pending.nonce,
             "iat": now,
             "exp": now + 3600

@@ -113,7 +113,7 @@ pub async fn load_settings(cx: &Cx, user_id: Uuid, today: NaiveDate) -> Result<G
     let available_nutrients = sqlx::query_scalar(
         "SELECT display_name
          FROM nutrients
-         WHERE code <> 'energy' AND NOT (code = ANY($1))
+         WHERE code <> 'energy' AND NOT is_archived AND NOT (code = ANY($1))
          ORDER BY display_order, display_name",
     )
     .bind(DEFAULT_NUTRIENTS)
@@ -218,7 +218,8 @@ async fn save_goals(cx: &Cx, Form(input): Form<HashMap<String, String>>) -> Resu
         let matches: Vec<String> = sqlx::query_scalar(
             "SELECT code
              FROM nutrients
-             WHERE code <> 'energy' AND lower(display_name) = lower($1)",
+             WHERE code <> 'energy' AND NOT is_archived
+               AND lower(display_name) = lower($1)",
         )
         .bind(added_name)
         .fetch_all(db(cx))

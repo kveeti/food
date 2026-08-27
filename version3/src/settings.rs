@@ -101,6 +101,13 @@ async fn settings(cx: &Cx) -> Result {
                 <h1 class="text-xl font-semibold tracking-tight text-gray-1000">"Settings"</h1>
             </header>
 
+            if user.is_admin {
+                <section class="mb-8 rounded-xl border border-gray-200 p-4">
+                    <h2 class="text-base font-medium text-gray-1000">"Admin"</h2>
+                    <a href="/admin/imports" class="mt-2 inline-block text-sm font-medium text-gray-800 underline underline-offset-4">"Food imports"</a>
+                </section>
+            }
+
             <section aria-labelledby="timezone-heading">
                 <h2 id="timezone-heading" class="mb-1 text-base font-medium text-gray-1000">"Timezone"</h2>
                 <p class="mb-4 text-sm leading-6 text-gray-600">

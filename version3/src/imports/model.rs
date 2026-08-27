@@ -33,6 +33,7 @@ pub struct Food {
     pub source_id: String,
     pub display_name: String,
     pub brand: String,
+    pub basis_unit: String,
     pub source_data: Value,
     pub aliases: Vec<Alias>,
     pub nutrients: BTreeMap<String, f64>,
@@ -44,6 +45,11 @@ pub struct FoodImport {
     pub nutrients: BTreeMap<String, NutrientDef>,
     pub mappings: BTreeMap<String, SourceMapping>,
     pub foods: Vec<Food>,
+}
+
+pub struct FoodDelta {
+    pub import: FoodImport,
+    pub changed_source_ids: Vec<String>,
 }
 
 pub fn data_error(message: impl Into<String>) -> io::Error {

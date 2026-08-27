@@ -22,11 +22,52 @@ use topcoat::{
         error::{RouterErrorExt, bad_request, see_other, unauthorized},
         header, headers, query_params, route,
     },
-    session,
+    session::{self, Token, TokenStore, TokenStoreFuture},
 };
 use url::Url;
 
 const FLOW_COOKIE: &str = "oidc_flow";
+const DEV_SESSION_COOKIE: &str = "dev_session";
+
+pub struct DevCookieTokenStore;
+
+impl TokenStore for DevCookieTokenStore {
+    fn read<'a>(&'a self, cx: &'a Cx) -> TokenStoreFuture<'a, Option<Token>> {
+        Box::pin(async move {
+            let Some(cookie) = cookies(cx).get(DEV_SESSION_COOKIE) else {
+                return Ok(None);
+            };
+            Ok(Token::decode(cookie.value()).ok())
+        })
+    }
+
+    fn write<'a>(
+        &'a self,
+        cx: &'a Cx,
+        token: Token,
+        max_age: StdDuration,
+    ) -> TokenStoreFuture<'a, ()> {
+        Box::pin(async move {
+            cookies(cx).add(
+                Cookie::build((DEV_SESSION_COOKIE, token.encode()))
+                    .path("/")
+                    .http_only(true)
+                    .secure(false)
+                    .same_site(SameSite::Lax)
+                    .max_age(Duration::try_from(max_age)?)
+                    .build(),
+            );
+            Ok(())
+        })
+    }
+
+    fn delete<'a>(&'a self, cx: &'a Cx) -> TokenStoreFuture<'a, ()> {
+        Box::pin(async move {
+            cookies(cx).remove(Cookie::build((DEV_SESSION_COOKIE, "")).path("/").build());
+            Ok(())
+        })
+    }
+}
 
 type OidcClient = CoreClient<
     EndpointSet,
@@ -43,6 +84,9 @@ pub struct Auth {
     pub issuer: String,
     pub client_id: String,
     pub client_secret: String,
+    admin_claim: String,
+    admin_value: String,
+    scopes: Vec<String>,
     client: OnceCell<OidcClient>,
     http: reqwest::Client,
 }
@@ -70,6 +114,25 @@ impl Auth {
             )
         };
 
+        let (admin_claim, admin_value, scopes) = if is_prod {
+            (
+                required_env("OIDC_ADMIN_CLAIM"),
+                required_env("OIDC_ADMIN_VALUE"),
+                env::var("OIDC_SCOPES").unwrap_or_else(|_| "email".to_owned()),
+            )
+        } else {
+            (
+                "groups".to_owned(),
+                "food-admin".to_owned(),
+                "email groups".to_owned(),
+            )
+        };
+        let scopes = scopes
+            .split([',', ' '])
+            .filter(|scope| !scope.is_empty() && *scope != "openid")
+            .map(str::to_owned)
+            .collect();
+
         let http = reqwest::ClientBuilder::new()
             .redirect(reqwest::redirect::Policy::none())
             .timeout(StdDuration::from_secs(10))
@@ -82,6 +145,9 @@ impl Auth {
             issuer,
             client_id,
             client_secret,
+            admin_claim,
+            admin_value,
+            scopes,
             client: OnceCell::new(),
             http,
         }
@@ -199,7 +265,7 @@ pub async fn login(cx: &Cx) -> Result<Response> {
             CsrfToken::new_random,
             Nonce::new_random,
         )
-        .add_scope(Scope::new("email".to_owned()))
+        .add_scopes(auth.scopes.iter().cloned().map(Scope::new))
         .set_pkce_challenge(pkce_challenge)
         .url();
 
@@ -272,6 +338,11 @@ pub async fn callback(cx: &Cx) -> Result<Response> {
     let issuer = claims.issuer().as_str();
     let subject = claims.subject().as_str();
     let email = claims.email().map_or("", |email| email.as_str());
+    let is_admin = has_admin_claim(
+        &id_token.to_string(),
+        &auth(cx).admin_claim,
+        &auth(cx).admin_value,
+    );
     let mut tx = db(cx).begin().await?;
     let user_id: Uuid = sqlx::query_scalar(
         "INSERT INTO users (issuer, subject, email)
@@ -288,17 +359,18 @@ pub async fn callback(cx: &Cx) -> Result<Response> {
 
     let new_session = session::start(cx).await?;
     sqlx::query(
-        "INSERT INTO sessions (token_hash, user_id, expires_at)
-         VALUES ($1, $2, $3)",
+        "INSERT INTO sessions (token_hash, user_id, is_admin, expires_at)
+         VALUES ($1, $2, $3, $4)",
     )
     .bind(&new_session.token_hash[..])
     .bind(user_id)
+    .bind(is_admin)
     .bind(DateTime::<Utc>::from(new_session.expires_at))
     .execute(&mut *tx)
     .await?;
     tx.commit().await?;
 
-    Ok(see_other("/").into_response(cx)?)
+    see_other("/").into_response(cx)
 }
 
 #[route(POST "/logout")]
@@ -310,13 +382,14 @@ pub async fn logout(cx: &Cx) -> Result<Response> {
             .await?;
     }
 
-    Ok(see_other("/login").into_response(cx)?)
+    see_other("/login").into_response(cx)
 }
 
 #[derive(Debug)]
 pub struct User {
     pub id: Uuid,
     pub timezone: Option<String>,
+    pub is_admin: bool,
 }
 
 async fn current_user(cx: &Cx) -> Result<Option<User>> {
@@ -325,7 +398,7 @@ async fn current_user(cx: &Cx) -> Result<Option<User>> {
     };
 
     let user = sqlx::query_as(
-        "SELECT users.id, users.timezone
+        "SELECT users.id, users.timezone, sessions.is_admin
          FROM sessions
          JOIN users ON users.id = sessions.user_id
          WHERE sessions.token_hash = $1
@@ -335,13 +408,70 @@ async fn current_user(cx: &Cx) -> Result<Option<User>> {
     .fetch_optional(db(cx))
     .await?;
 
-    Ok(user.map(|(id, timezone)| User { id, timezone }))
+    Ok(user.map(|(id, timezone, is_admin)| User {
+        id,
+        timezone,
+        is_admin,
+    }))
 }
 
 pub async fn require_user(cx: &Cx) -> Result<User> {
     Ok(current_user(cx).await?.ok_or_redirect("/login")?)
 }
 
+pub async fn require_admin(cx: &Cx) -> Result<User> {
+    let user = require_user(cx).await?;
+    if !user.is_admin {
+        return Err(unauthorized().into());
+    }
+    Ok(user)
+}
+
+fn has_admin_claim(id_token: &str, claim: &str, expected: &str) -> bool {
+    let Some(payload) = id_token.split('.').nth(1) else {
+        return false;
+    };
+    let Ok(payload) = URL_SAFE_NO_PAD.decode(payload) else {
+        return false;
+    };
+    let Ok(claims) = serde_json::from_slice::<serde_json::Value>(&payload) else {
+        return false;
+    };
+    match &claims[claim] {
+        serde_json::Value::String(value) => value == expected,
+        serde_json::Value::Array(values) => values.iter().any(|value| value == expected),
+        _ => false,
+    }
+}
+
 fn secret_eq(left: &str, right: &str) -> bool {
     Sha256::digest(left.as_bytes()) == Sha256::digest(right.as_bytes())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn token(claims: serde_json::Value) -> String {
+        format!("x.{}.x", URL_SAFE_NO_PAD.encode(claims.to_string()))
+    }
+
+    #[test]
+    fn admin_claim_accepts_a_matching_string_or_array() {
+        assert!(has_admin_claim(
+            &token(serde_json::json!({"role": "admin"})),
+            "role",
+            "admin"
+        ));
+        assert!(has_admin_claim(
+            &token(serde_json::json!({"groups": ["users", "food-admin"]})),
+            "groups",
+            "food-admin"
+        ));
+        assert!(!has_admin_claim(
+            &token(serde_json::json!({"groups": ["users"]})),
+            "groups",
+            "food-admin"
+        ));
+    }
 }

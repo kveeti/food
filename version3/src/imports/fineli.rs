@@ -79,6 +79,7 @@ pub fn read_fineli(directory: &Path) -> Result<FoodImport, Box<dyn Error>> {
                 source_id,
                 display_name,
                 brand: String::new(),
+                basis_unit: "g".to_owned(),
                 source_data,
                 aliases: Vec::new(),
                 nutrients: BTreeMap::new(),

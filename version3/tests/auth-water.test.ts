@@ -1,3 +1,5 @@
+import { gzipSync } from "node:zlib";
+
 import { expect, test } from "@playwright/test";
 
 import { chooseTimezone, ensureTimezone, login } from "./helpers";
@@ -27,6 +29,9 @@ test("OIDC login creates a session and logout ends it", async ({
 }, testInfo) => {
   await login(page, testInfo);
 
+  const adminResponse = await page.goto("/admin/imports");
+  expect(adminResponse?.status()).toBe(401);
+  await page.goto("/");
   await page.getByRole("button", { name: "log out" }).click();
   await expect(
     page.getByRole("heading", { name: "Pick a dev user" }),
@@ -118,6 +123,8 @@ test("goals apply from their starting date", async ({ page }, testInfo) => {
   await login(page, testInfo);
 
   await page.getByRole("link", { name: "settings" }).click();
+  await expect(page.locator('#nutrient-goal-names option[value="Carbohydrate by difference"]')).toHaveCount(1);
+  await expect(page.locator('#nutrient-goal-names option[value="Old nutrient"]')).toHaveCount(0);
   await page.getByLabel("Baseline burn").fill("1800");
   await expect(page.getByLabel("By")).toBeHidden();
   await page.locator('select[name="adjustment_kind"]').selectOption("deficit");
@@ -172,6 +179,35 @@ test("water progress shows amounts over the goal", async ({ page }, testInfo) =>
   await expect(progress).toContainText("250 ml over");
   await expect(progress).toHaveAttribute("aria-valuemax", "2250");
   await expect(progress.locator('[data-goal-over="true"]')).toBeVisible();
+});
+
+test("admins can queue an OFF delta upload", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("link", { name: /alice@dev\.local/ }).click();
+  await ensureTimezone(page);
+  await page.getByRole("link", { name: "settings" }).click();
+  await page.getByRole("link", { name: "Food imports" }).click();
+  await expect(page.getByRole("heading", { name: "Food imports" })).toBeVisible();
+
+  const delta = `${JSON.stringify({
+    code: "9999999999999",
+    product_name: "Admin delta food",
+    countries_tags: ["en:finland"],
+    nutrition_data_per: "100g",
+    nutriments: { proteins_100g: 2 },
+  })}\n`;
+  await page.locator('form[action="/admin/imports/off/deltas/upload"] input[type="file"]').setInputFiles({
+    name: "openfoodfacts_products_1_2.json.gz",
+    mimeType: "application/gzip",
+    buffer: gzipSync(delta),
+  });
+  await page.locator('form[action="/admin/imports/off/deltas/upload"] button').click();
+
+  await expect(async () => {
+    await page.reload();
+    await expect(page.getByText("succeeded", { exact: true }).first()).toBeVisible();
+    await expect(page.getByText("1 changed products, 1 imported", { exact: true })).toBeVisible();
+  }).toPass({ timeout: 20_000 });
 });
 
 test("login and water forms work without JavaScript", async ({ browser }, testInfo) => {

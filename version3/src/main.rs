@@ -1,3 +1,4 @@
+mod admin;
 mod app;
 mod auth;
 mod components;
@@ -37,19 +38,24 @@ async fn main() {
     let timezone_catalog = settings::TimezoneCatalog::load(&pool).await.unwrap();
 
     let auth = auth::Auth::from_env();
+    let import_config = admin::ImportConfig::from_env(auth.is_prod);
     let dev_provider = (!auth.is_prod).then(|| dev_oidc::DevOidc::new(&auth));
+    let session_config = SessionConfig::builder().lifetime(Duration::from_secs(7 * 24 * 60 * 60));
+    let session_config = if auth.is_prod {
+        session_config
+    } else {
+        session_config.token_store(auth::DevCookieTokenStore)
+    };
     let builder = Router::builder()
         .font(app::GEIST)
         .cookies()
-        .sessions(
-            SessionConfig::builder()
-                .lifetime(Duration::from_secs(7 * 24 * 60 * 60))
-                .build(),
-        )
+        .sessions(session_config.build())
         .assets(AssetBundle::load().unwrap())
-        .app_context(pool)
+        .app_context(pool.clone())
         .app_context(auth)
+        .app_context(import_config.clone())
         .app_context(timezone_catalog);
+    let builder = admin::register(builder);
     let builder = app::register(builder);
     let builder = auth::register(builder);
     let builder = food::register(builder);
@@ -63,5 +69,15 @@ async fn main() {
         builder
     };
 
-    topcoat::start(builder.build()).await.unwrap();
+    tokio::select! {
+        result = admin::run_worker(pool, import_config) => {
+            if let Err(error) = result {
+                panic!("import worker stopped: {error}");
+            }
+            std::future::pending::<()>().await;
+        }
+        result = topcoat::start(builder.build()) => {
+            result.unwrap();
+        }
+    }
 }

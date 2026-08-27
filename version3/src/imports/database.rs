@@ -2,11 +2,26 @@ use std::error::Error;
 
 use sqlx::{Connection, PgConnection};
 
-use super::model::FoodImport;
+use super::model::{FoodDelta, FoodImport};
 
 pub async fn write_import(
     connection: &mut PgConnection,
     import: FoodImport,
+) -> Result<(), Box<dyn Error>> {
+    write(connection, import, None).await
+}
+
+pub async fn write_delta(
+    connection: &mut PgConnection,
+    delta: FoodDelta,
+) -> Result<(), Box<dyn Error>> {
+    write(connection, delta.import, Some(delta.changed_source_ids)).await
+}
+
+async fn write(
+    connection: &mut PgConnection,
+    import: FoodImport,
+    changed_source_ids: Option<Vec<String>>,
 ) -> Result<(), Box<dyn Error>> {
     let mut transaction = connection.begin().await?;
     let source = import.source;
@@ -39,13 +54,19 @@ pub async fn write_import(
         .map(|nutrient| nutrient.display_order)
         .collect::<Vec<_>>();
     sqlx::query(
-        "INSERT INTO nutrients (code, display_name, unit, category, display_order)
-         SELECT * FROM UNNEST($1::text[], $2::text[], $3::text[], $4::text[], $5::int4[])
+        "INSERT INTO nutrients (
+             code, display_name, unit, category, display_order, is_archived
+         )
+         SELECT input.code, input.display_name, input.unit, input.category,
+                input.display_order, false
+         FROM UNNEST($1::text[], $2::text[], $3::text[], $4::text[], $5::int4[])
+              AS input(code, display_name, unit, category, display_order)
          ON CONFLICT (code) DO UPDATE SET
              display_name = EXCLUDED.display_name,
              unit = EXCLUDED.unit,
              category = EXCLUDED.category,
              display_order = EXCLUDED.display_order,
+             is_archived = false,
              updated_at = now()",
     )
     .bind(&codes)
@@ -55,6 +76,13 @@ pub async fn write_import(
     .bind(&orders)
     .execute(&mut *transaction)
     .await?;
+
+    if changed_source_ids.is_none() {
+        sqlx::query("DELETE FROM nutrient_source_keys WHERE source = $1")
+            .bind(source)
+            .execute(&mut *transaction)
+            .await?;
+    }
 
     let mappings = import.mappings.values().collect::<Vec<_>>();
     let mapping_keys = mappings
@@ -94,10 +122,22 @@ pub async fn write_import(
     .execute(&mut *transaction)
     .await?;
 
-    sqlx::query("UPDATE foods SET is_archived = true, updated_at = now() WHERE source = $1")
+    if let Some(changed_source_ids) = &changed_source_ids {
+        sqlx::query(
+            "UPDATE foods
+             SET is_archived = true, updated_at = now()
+             WHERE source = $1 AND source_id = ANY($2)",
+        )
         .bind(source)
+        .bind(changed_source_ids)
         .execute(&mut *transaction)
         .await?;
+    } else {
+        sqlx::query("UPDATE foods SET is_archived = true, updated_at = now() WHERE source = $1")
+            .bind(source)
+            .execute(&mut *transaction)
+            .await?;
+    }
 
     let source_ids = import
         .foods
@@ -114,6 +154,11 @@ pub async fn write_import(
         .iter()
         .map(|food| food.brand.clone())
         .collect::<Vec<_>>();
+    let basis_units = import
+        .foods
+        .iter()
+        .map(|food| food.basis_unit.clone())
+        .collect::<Vec<_>>();
     let source_data = import
         .foods
         .iter()
@@ -123,10 +168,10 @@ pub async fn write_import(
         "INSERT INTO foods (
              source, source_id, display_name, brand, basis_unit, source_data, is_archived
          )
-         SELECT $1, input.source_id, input.display_name, NULLIF(input.brand, ''), 'g',
-                input.source_data::jsonb, false
-         FROM UNNEST($2::text[], $3::text[], $4::text[], $5::text[])
-              AS input(source_id, display_name, brand, source_data)
+         SELECT $1, input.source_id, input.display_name, NULLIF(input.brand, ''),
+                input.basis_unit, input.source_data::jsonb, false
+         FROM UNNEST($2::text[], $3::text[], $4::text[], $5::text[], $6::text[])
+              AS input(source_id, display_name, brand, basis_unit, source_data)
          ON CONFLICT (source, source_id) WHERE source_id IS NOT NULL DO UPDATE SET
              display_name = EXCLUDED.display_name,
              brand = EXCLUDED.brand,
@@ -139,18 +184,32 @@ pub async fn write_import(
     .bind(&source_ids)
     .bind(&display_names)
     .bind(&brands)
+    .bind(&basis_units)
     .bind(&source_data)
     .execute(&mut *transaction)
     .await?;
 
-    sqlx::query(
-        "DELETE FROM food_aliases
-         USING foods
-         WHERE food_aliases.food_id = foods.id AND foods.source = $1",
-    )
-    .bind(source)
-    .execute(&mut *transaction)
-    .await?;
+    if let Some(changed_source_ids) = &changed_source_ids {
+        sqlx::query(
+            "DELETE FROM food_aliases
+             USING foods
+             WHERE food_aliases.food_id = foods.id
+               AND foods.source = $1 AND foods.source_id = ANY($2)",
+        )
+        .bind(source)
+        .bind(changed_source_ids)
+        .execute(&mut *transaction)
+        .await?;
+    } else {
+        sqlx::query(
+            "DELETE FROM food_aliases
+             USING foods
+             WHERE food_aliases.food_id = foods.id AND foods.source = $1",
+        )
+        .bind(source)
+        .execute(&mut *transaction)
+        .await?;
+    }
 
     let mut alias_source_ids = Vec::new();
     let mut alias_names = Vec::new();
@@ -177,14 +236,27 @@ pub async fn write_import(
     .execute(&mut *transaction)
     .await?;
 
-    sqlx::query(
-        "DELETE FROM food_nutrients
-         USING foods
-         WHERE food_nutrients.food_id = foods.id AND foods.source = $1",
-    )
-    .bind(source)
-    .execute(&mut *transaction)
-    .await?;
+    if let Some(changed_source_ids) = &changed_source_ids {
+        sqlx::query(
+            "DELETE FROM food_nutrients
+             USING foods
+             WHERE food_nutrients.food_id = foods.id
+               AND foods.source = $1 AND foods.source_id = ANY($2)",
+        )
+        .bind(source)
+        .bind(changed_source_ids)
+        .execute(&mut *transaction)
+        .await?;
+    } else {
+        sqlx::query(
+            "DELETE FROM food_nutrients
+             USING foods
+             WHERE food_nutrients.food_id = foods.id AND foods.source = $1",
+        )
+        .bind(source)
+        .execute(&mut *transaction)
+        .await?;
+    }
 
     let mut value_source_ids = Vec::new();
     let mut value_codes = Vec::new();
@@ -212,24 +284,62 @@ pub async fn write_import(
     .execute(&mut *transaction)
     .await?;
 
+    sqlx::query(
+        "UPDATE nutrients
+         SET is_archived = NOT EXISTS (
+                 SELECT 1
+                 FROM food_nutrients values
+                 JOIN foods ON foods.id = values.food_id
+                 WHERE values.nutrient_id = nutrients.id
+                   AND NOT foods.is_archived
+             ),
+             updated_at = now()
+         WHERE is_archived = EXISTS (
+                 SELECT 1
+                 FROM food_nutrients values
+                 JOIN foods ON foods.id = values.food_id
+                 WHERE values.nutrient_id = nutrients.id
+                   AND NOT foods.is_archived
+             )",
+    )
+    .execute(&mut *transaction)
+    .await?;
+
     sqlx::raw_sql(
         "ALTER TABLE foods ENABLE TRIGGER foods_search_vector_trigger;
          ALTER TABLE food_aliases ENABLE TRIGGER food_aliases_search_vector_trigger;",
     )
     .execute(&mut *transaction)
     .await?;
-    sqlx::query(
-        "SELECT refresh_food_search_vector(id)
-         FROM foods
-         WHERE source = $1 AND NOT is_archived",
-    )
-    .bind(source)
-    .execute(&mut *transaction)
-    .await?;
+    if let Some(changed_source_ids) = &changed_source_ids {
+        sqlx::query(
+            "SELECT refresh_food_search_vector(id)
+             FROM foods
+             WHERE source = $1 AND source_id = ANY($2)",
+        )
+        .bind(source)
+        .bind(changed_source_ids)
+        .execute(&mut *transaction)
+        .await?;
+    } else {
+        sqlx::query(
+            "SELECT refresh_food_search_vector(id)
+             FROM foods
+             WHERE source = $1 AND NOT is_archived",
+        )
+        .bind(source)
+        .execute(&mut *transaction)
+        .await?;
+    }
 
     transaction.commit().await?;
     println!(
-        "imported {} foods and {} nutrient values from {}",
+        "{} {} foods and {} nutrient values from {}",
+        if changed_source_ids.is_some() {
+            "updated"
+        } else {
+            "imported"
+        },
         source_ids.len(),
         values.len(),
         source
