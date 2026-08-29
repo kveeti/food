@@ -1,0 +1,10 @@
+{
+  "tasks": {
+    "check": "deno fmt --check && deno lint && deno check playwright.config.ts tests/home.spec.ts",
+    "e2e": "deno run -A npm:playwright@1.61.1 test"
+  },
+  "imports": {
+    "@playwright/test": "npm:@playwright/test@1.61.1"
+  },
+  "nodeModulesDir": "auto"
+}
