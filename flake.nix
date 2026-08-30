@@ -25,9 +25,10 @@
             pkgs.cargo
             pkgs.rustfmt
             pkgs.clippy
-            pkgs.rust-analyzer
             pkgs.otel-tui
+            pkgs.rust-analyzer
           ];
+          RUST_SRC_PATH = "${pkgs.rustPlatform.rustLibSrc}";
 
           shellHook = ''
             export PLAYWRIGHT_BROWSERS_PATH="${pkgs.playwright-driver.browsers}"

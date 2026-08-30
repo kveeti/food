@@ -1,8 +1,10 @@
 mod app;
+mod assets;
 mod auth;
 mod config;
 mod data;
 mod http;
+mod settings;
 mod telemetry;
 
 use std::sync::Arc;
@@ -30,7 +32,9 @@ async fn run(exports_otlp: bool) -> Result<()> {
 
     let builder = Router::builder().app_context(data).app_context(auth);
     let builder = http::register(builder, exports_otlp);
+    let builder = assets::register(builder);
     let builder = app::register(builder);
+    let builder = settings::register(builder);
     let builder = auth::routes::register(builder);
 
     tracing::info!(app_url = %config.app_url, "starting Food");

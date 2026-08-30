@@ -6,5 +6,11 @@
   "imports": {
     "@playwright/test": "npm:@playwright/test@1.61.1"
   },
+  "fmt": {
+    "exclude": ["assets/htmx-4.0.0.min.js"]
+  },
+  "lint": {
+    "exclude": ["assets/htmx-4.0.0.min.js"]
+  },
   "nodeModulesDir": "auto"
 }

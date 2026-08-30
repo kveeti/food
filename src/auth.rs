@@ -44,8 +44,16 @@ pub struct Auth {
 }
 
 pub struct User {
-    id: Uuid,
+    pub(crate) id: Uuid,
     pub email: Option<String>,
+    pub locale: Option<String>,
+    pub timezone: Option<String>,
+}
+
+impl User {
+    pub fn has_settings(&self) -> bool {
+        self.locale.is_some() && self.timezone.is_some()
+    }
 }
 
 struct Authenticated {
@@ -274,6 +282,8 @@ async fn refresh_session(
                 user: User {
                     id: session.user_id,
                     email: session.email,
+                    locale: session.locale,
+                    timezone: session.timezone,
                 },
                 expires_at: tokens.refresh_expires_at,
             };
@@ -329,6 +339,8 @@ fn authenticated(session: &Session) -> Authenticated {
         user: User {
             id: session.user_id,
             email: session.email.to_owned(),
+            locale: session.locale.to_owned(),
+            timezone: session.timezone.to_owned(),
         },
         expires_at: session.refresh_expires_at,
     }

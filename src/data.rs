@@ -18,6 +18,8 @@ pub struct Session {
     pub refresh_retry_after: Option<DateTime<Utc>>,
     pub refresh_expires_at: DateTime<Utc>,
     pub email: Option<String>,
+    pub locale: Option<String>,
+    pub timezone: Option<String>,
     pub issuer: String,
     pub subject: String,
 }
@@ -128,6 +130,26 @@ impl Data {
             token_hash,
             lock: SessionLock::Skip,
         }
+    }
+
+    #[tracing::instrument(name = "data::save_user_settings", level = "debug", skip_all)]
+    pub async fn save_user_settings(
+        &self,
+        user_id: Uuid,
+        locale: &str,
+        timezone: &str,
+    ) -> Result<()> {
+        sqlx::query(
+            "UPDATE users
+             SET locale = $1, timezone = $2, updated_at = now()
+             WHERE id = $3",
+        )
+        .bind(locale)
+        .bind(timezone)
+        .bind(user_id)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
     }
 
     #[tracing::instrument(name = "data::delete_session", level = "debug", skip_all)]
@@ -279,6 +301,8 @@ const SESSION_QUERY: &str = "SELECT sessions.id,
             sessions.refresh_retry_after,
             sessions.refresh_expires_at,
             users.email,
+            users.locale,
+            users.timezone,
             users.issuer,
             users.subject
      FROM sessions

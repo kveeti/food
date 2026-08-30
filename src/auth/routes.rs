@@ -62,21 +62,10 @@ async fn sign_in(cx: &Cx) -> Result {
     let href = format!("/auth/sign-in?{}", return_query(&return_to));
 
     view! {
-        <!DOCTYPE html>
-        <html lang="en">
-            <head>
-                <meta charset="utf-8">
-                <meta name="viewport" content="width=device-width, initial-scale=1">
-                <title>"Sign in"</title>
-                topcoat::dev::script()
-            </head>
-            <body>
-                <main>
-                    <h1>"Sign in"</h1>
-                    <p><a href=(href)>"Sign in"</a></p>
-                </main>
-            </body>
-        </html>
+        <main>
+            <h1>"Sign in"</h1>
+            <p><a href=(href)>"Sign in"</a></p>
+        </main>
     }
 }
 
