@@ -1,27 +1,55 @@
-# Export variables from ./.env if it exists
 ifneq (,$(wildcard ./.env))
 	include .env
 	export
 endif
 
-.PHONY: all
-MAKEFLAGS += -j
+include dev-idp.env
 
-frontdev:
-	@cd front && pnpm run dev
-backdev:
-	@cd back && cargo watch -x run
-dev: backdev frontdev
+PORT ?= 8000
+IDP_PORT ?= $(shell expr $(PORT) + 1)
+LOCAL_APP_URL = http://127.0.0.1:$(PORT)
+LOCAL_OIDC_ISSUER = http://127.0.0.1:$(IDP_PORT)
 
-frontbuild:
-	@cd front && pnpm run build
-backbuild:
-	@cd back && cargo build --release
-build: backbuild frontbuild
+.PHONY: dev devi otel build check e2e fmt watch-local-app watch-idp
 
-frontpreview:
-	@cd front && pnpm run build && pnpm run preview
-backpreview:
-	@cd back && FRONTEND_DIR=../front/dist cargo run --release
-preview: backpreview frontpreview
+dev:
+	@test -f .env || { echo "Copy .env.example to .env and fill it in."; exit 1; }
+	@cargo run --bin food
 
+devi:
+	@$(MAKE) --no-print-directory -j2 watch-local-app watch-idp
+
+otel:
+	@otel-tui
+
+watch-local-app:
+	@PORT="$(PORT)" APP_URL="$(LOCAL_APP_URL)" \
+	OIDC_ISSUER="$(LOCAL_OIDC_ISSUER)" \
+	OIDC_CLIENT_ID="$(DEV_OIDC_CLIENT_ID)" \
+	OIDC_CLIENT_SECRET="$(DEV_OIDC_CLIENT_SECRET)" \
+	SESSION_ENCRYPTION_KEY="$(DEV_SESSION_ENCRYPTION_KEY)" \
+	ALLOW_INSECURE_OIDC=1 \
+	cargo run --bin food
+
+watch-idp:
+	@PORT="$(IDP_PORT)" APP_URL="$(LOCAL_APP_URL)" \
+	OIDC_ISSUER="$(LOCAL_OIDC_ISSUER)" \
+	OIDC_CLIENT_ID="$(DEV_OIDC_CLIENT_ID)" \
+	OIDC_CLIENT_SECRET="$(DEV_OIDC_CLIENT_SECRET)" \
+	cargo run --bin dev_idp
+
+build:
+	@cargo build --bins
+
+check:
+	@cargo fmt --check
+	@cargo test --bins
+	@cargo clippy --bins -- -D warnings
+	@deno task check
+
+e2e:
+	@deno task e2e
+
+fmt:
+	@cargo fmt
+	@deno fmt

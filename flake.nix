@@ -1,97 +1,77 @@
 {
   description = "Food";
 
-  inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-  };
+  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 
-  outputs = { self, nixpkgs }:
+  outputs =
+    { nixpkgs, ... }:
     let
-      supportedSystems = [
+      systems = [
         "x86_64-linux"
         "aarch64-linux"
-        "aarch64-darwin"
         "x86_64-darwin"
+        "aarch64-darwin"
       ];
-      forAllSystems = nixpkgs.lib.genAttrs supportedSystems;
+      forAllSystems = f: nixpkgs.lib.genAttrs systems (system: f nixpkgs.legacyPackages.${system});
     in
     {
-      packages = forAllSystems (system:
-        let
-          pkgs = nixpkgs.legacyPackages.${system};
+      devShells = forAllSystems (pkgs: {
+        default = pkgs.mkShell {
+          packages = [
+            pkgs.playwright-driver.browsers
+            pkgs.postgresql_18
+            pkgs.deno
+            pkgs.rustc
+            pkgs.cargo
+            pkgs.rustfmt
+            pkgs.clippy
+            pkgs.rust-analyzer
+            pkgs.otel-tui
+          ];
 
-          frontend = pkgs.stdenv.mkDerivation (finalAttrs: {
-            pname = "food-frontend";
-            version = "0.0.1";
-            src = ./front;
+          shellHook = ''
+            export PLAYWRIGHT_BROWSERS_PATH="${pkgs.playwright-driver.browsers}"
+            for chromium in "${pkgs.playwright-driver.browsers}"/chromium-*/chrome-linux64/chrome; do
+              if [ -x "$chromium" ]; then
+                export PLAYWRIGHT_CHROMIUM_EXECUTABLE="$chromium"
+                break
+              fi
+            done
 
-            pnpmDeps = pkgs.fetchPnpmDeps {
-              inherit (finalAttrs) pname version src;
-              fetcherVersion = 3;
-              hash = "sha256-JFkVDQ+aVcnTCpxnFN1eeGbDDB+dClRboHfESPf2sy8=";
-            };
+            free_port() {
+              local port="$1"
+              while (echo >/dev/tcp/127.0.0.1/"$port") 2>/dev/null; do
+                port=$((port + 1))
+              done
+              echo "$port"
+            }
 
-            nativeBuildInputs = with pkgs; [
-              nodejs_24
-              pnpm_10
-              pnpmConfigHook
-            ];
+            export PGDATA="$PWD/.pg"
+            mkdir -p "$PGDATA"
+            chmod 700 "$PGDATA"
 
-            buildPhase = ''
-              runHook preBuild
-              pnpm build
-              runHook postBuild
-            '';
+            if [ ! -f "$PGDATA/PG_VERSION" ]; then
+              echo "Initializing PostgreSQL..."
+              initdb -D "$PGDATA" -U postgres >/dev/null || exit 1
+            fi
 
-            installPhase = ''
-              runHook preInstall
-              cp -r dist $out
-              runHook postInstall
-            '';
-          });
+            if ! pg_ctl -D "$PGDATA" status >/dev/null 2>&1; then
+              port="$(free_port "''${PGPORT:-5556}")"
+              echo "Starting PostgreSQL on port $port..."
+              pg_ctl -D "$PGDATA" -o "-p $port" -l "$PGDATA/server.log" -w start >/dev/null || exit 1
+            fi
 
-          backend = pkgs.rustPlatform.buildRustPackage {
-            pname = "food-backend";
-            version = "0.0.1";
-            src = ./back;
+            unset -f free_port
+            export PGPORT="$(awk 'NR == 4 { print; exit }' "$PGDATA/postmaster.pid")"
+            export PGHOST=127.0.0.1
+            export PGUSER=postgres
+            export DATABASE_URL="postgres://postgres@127.0.0.1:$PGPORT/postgres"
 
-            cargoLock = {
-              lockFile = ./back/Cargo.lock;
-            };
-          };
-        in {
-          inherit frontend backend;
-
-          default = pkgs.runCommand "food" {
-            nativeBuildInputs = [ pkgs.makeWrapper ];
-          } ''
-            mkdir -p $out/bin
-            makeWrapper ${backend}/bin/back $out/bin/food \
-              --set FRONTEND_DIR ${frontend}
+            echo "PostgreSQL: $DATABASE_URL"
+            alias pg='psql'
+            alias fin='pg_ctl -D "$PGDATA" stop && exit'
           '';
-        }
-      );
-
-      devShells = forAllSystems (system:
-        let
-          pkgs = nixpkgs.legacyPackages.${system};
-        in {
-          default = pkgs.mkShell {
-            nativeBuildInputs = with pkgs; [
-              nodejs_24
-              pnpm_10
-              rustup
-              cargo-watch
-              sqlite
-            ];
-          };
-        }
-      );
-
-      nixosModules.default = { pkgs, ... }@args:
-        let
-          foodPkg = self.packages.${pkgs.system}.default;
-        in
-        import ./module.nix { inherit foodPkg; } args;
+        };
+      });
     };
 }
