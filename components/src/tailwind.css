@@ -1,0 +1,13 @@
+@import "tailwindcss";
+
+@source "./**/*.{ts,tsx}";
+
+/* Native popovers leave normal layout, so these placement rules belong to the behavior. */
+[data-combobox-popup][popover] {
+    position: fixed;
+    inset: auto;
+    top: anchor(bottom);
+    left: anchor(left);
+    width: anchor-size(width);
+    position-try-fallbacks: flip-block;
+}

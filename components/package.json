@@ -1,0 +1,28 @@
+{
+  "name": "server-components-playground",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build:css": "tailwindcss -i src/tailwind.css -o public/assets/styles.css --minify",
+    "dev": "concurrently --kill-others \"pnpm dev:css\" \"pnpm dev:server\"",
+    "dev:css": "tailwindcss -i src/tailwind.css -o public/assets/styles.css --watch",
+    "dev:server": "tsx watch src/index.tsx",
+    "start": "pnpm build:css && tsx src/index.tsx",
+    "typecheck": "tsc --noEmit",
+    "test": "playwright test"
+  },
+  "dependencies": {
+    "@hono/node-server": "2.1.1",
+    "hono": "4.13.3",
+    "htmx.org": "4.0.0-beta6"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.61.1",
+    "@tailwindcss/cli": "4.3.3",
+    "@types/node": "24.13.3",
+    "concurrently": "10.0.5",
+    "tailwindcss": "4.3.3",
+    "tsx": "4.23.12",
+    "typescript": "7.0.2"
+  }
+}
