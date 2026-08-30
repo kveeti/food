@@ -268,7 +268,7 @@ async fn delete_water(cx: &Cx, Form(input): Form<DeleteForm>) -> Result<Response
     let water_goal = goals::water_goal_for_date(cx, user.id, date).await?;
     let fragment = view! {
         water_history(entries: &water.entries, date: date, open: true)
-        <span id="water-total-value" hx-swap-oob="outerHTML" class="font-medium text-gray-900">(water.total) " ml"</span>
+        <span id="water-total-value" hx-swap-oob="outerHTML" class="font-medium">(water.total) " ml"</span>
         water_progress(consumed: water.total, goal: water_goal, swap_oob: true)
     }?;
 
