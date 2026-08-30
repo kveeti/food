@@ -21,6 +21,12 @@
             pkgs.playwright-driver.browsers
             pkgs.postgresql_18
             pkgs.deno
+
+            pkgs.rustc
+            pkgs.cargo
+            pkgs.rustfmt
+            pkgs.clippy
+
             pkgs.duckdb
           ];
 
