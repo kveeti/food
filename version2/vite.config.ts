@@ -21,7 +21,7 @@ export default defineConfig({
   plugins: [
     safariJsonImports(),
     tailwindcss(),
-    solidStart({ devOverlay: false }),
+    solidStart({ devOverlay: false, middleware: "./src/lib/middleware.ts" }),
     nitro({ preset: "node-server" }),
   ],
   clearScreen: false,

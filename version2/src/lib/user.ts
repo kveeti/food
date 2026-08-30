@@ -10,7 +10,12 @@ export const getCurrentUser = query(async () => {
   "use server";
   const user = await userForToken(getCookie(authCookieName));
   if (!user) throw redirect(loginUrl);
-  return { id: user.publicId, email: user.email };
+  return { 
+    id: user.id,
+    publicId: user.publicId,
+    email: user.email,
+    timezone: "Europe/Helsinki"
+  };
 }, "current-user");
 
 export const logout = action(async () => {
@@ -19,3 +24,4 @@ export const logout = action(async () => {
   deleteCookie(authCookieName, { path: "/" });
   throw redirect(loginUrl);
 });
+

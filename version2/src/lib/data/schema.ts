@@ -1,12 +1,14 @@
 import { sql } from "drizzle-orm";
-import { index, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { index, pgTable, text, timestamp, uniqueIndex, uuid, integer } from "drizzle-orm/pg-core";
+
+const primaryId = uuid()
+  .default(sql`uuidv7()`)
+  .primaryKey();
 
 export const users = pgTable(
   "users",
   {
-    id: uuid()
-      .default(sql`uuidv7()`)
-      .primaryKey(),
+    id: primaryId,
     publicId: text("public_id").notNull().unique(),
     issuer: text().notNull(),
     subject: text().notNull(),
@@ -19,9 +21,7 @@ export const users = pgTable(
 export const sessions = pgTable(
   "sessions",
   {
-    id: uuid()
-      .default(sql`uuidv7()`)
-      .primaryKey(),
+    id: primaryId,
     userId: uuid("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
@@ -33,3 +33,16 @@ export const sessions = pgTable(
 );
 
 export type User = typeof users.$inferSelect;
+
+export const waterLog = pgTable(
+  "water_log",
+  {
+    id: primaryId,
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    amountMl: integer("amount_ml").notNull(),
+    consumedAt: timestamp("consumed_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  }
+)
