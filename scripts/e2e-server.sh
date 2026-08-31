@@ -28,7 +28,11 @@ trap 'exit 0' INT TERM
 psql "$admin_url" -v ON_ERROR_STOP=1 -c "CREATE DATABASE \"$database\"" >/dev/null
 
 cd "$root"
-cargo build --bins >"$tmp/build.log" 2>&1 || {
+topcoat asset bundle --bin food >"$tmp/build.log" 2>&1 || {
+  cat "$tmp/build.log" >&2
+  exit 1
+}
+cargo build --bin dev_idp >>"$tmp/build.log" 2>&1 || {
   cat "$tmp/build.log" >&2
   exit 1
 }

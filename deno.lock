@@ -34,7 +34,8 @@
   },
   "workspace": {
     "dependencies": [
-      "npm:@playwright/test@1.61.1"
+      "npm:@playwright/test@1.61.1",
+      "npm:playwright@1.61.1"
     ]
   }
 }

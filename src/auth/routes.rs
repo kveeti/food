@@ -62,9 +62,15 @@ async fn sign_in(cx: &Cx) -> Result {
     let href = format!("/auth/sign-in?{}", return_query(&return_to));
 
     view! {
-        <main>
-            <h1>"Sign in"</h1>
-            <p><a href=(href)>"Sign in"</a></p>
+        <main class="mx-auto flex min-h-screen max-w-xl items-center px-4 py-10">
+            <div>
+                <h1 class="text-2xl font-semibold tracking-tight">"Sign in to Food"</h1>
+                <p class="mt-6">
+                    <a href=(href) class="inline-flex rounded-lg bg-gray-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-gray-700 outline-2 outline-transparent outline-offset-2 focus-visible:outline-outline dark:bg-gray-100 dark:text-gray-950 dark:hover:bg-white">
+                        "Sign in"
+                    </a>
+                </p>
+            </div>
         </main>
     }
 }

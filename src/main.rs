@@ -1,6 +1,7 @@
 mod app;
 mod assets;
 mod auth;
+mod components;
 mod config;
 mod data;
 mod http;
@@ -10,7 +11,10 @@ mod telemetry;
 use std::sync::Arc;
 
 use anyhow::Result;
-use topcoat::router::Router;
+use topcoat::{
+    asset::{AssetBundle, RouterBuilderAssetExt},
+    router::Router,
+};
 
 use crate::{config::Config, data::Data, telemetry::Telemetry};
 
@@ -30,7 +34,10 @@ async fn run(exports_otlp: bool) -> Result<()> {
     data.start_session_cleanup().await?;
     let auth = Arc::new(auth::Auth::new(&config).await?);
 
-    let builder = Router::builder().app_context(data).app_context(auth);
+    let builder = Router::builder()
+        .app_context(data)
+        .app_context(auth)
+        .assets(AssetBundle::load()?);
     let builder = http::register(builder, exports_otlp);
     let builder = assets::register(builder);
     let builder = app::register(builder);

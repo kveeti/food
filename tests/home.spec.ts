@@ -19,6 +19,10 @@ test("requires locale and timezone after sign in", async ({ page }) => {
   await page.getByRole("link", { name: /alice@dev\.local/ }).click();
 
   await expect(page).toHaveURL(/\/settings\?return_to=/);
+  await expect(page.getByRole("navigation")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Today" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Settings" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Log out" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
   await expect(page.getByLabel("Locale")).not.toHaveValue("");
   await expect(page.getByLabel("Timezone")).not.toHaveValue("");

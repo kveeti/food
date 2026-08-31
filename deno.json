@@ -1,10 +1,12 @@
 {
   "tasks": {
     "check": "deno fmt --check && deno lint && deno check playwright.config.ts tests/home.spec.ts",
-    "e2e": "deno run -A npm:playwright@1.61.1 test"
+    "e2e": "deno run -A playwright test",
+    "e2e:browsers": "deno run -A playwright install"
   },
   "imports": {
-    "@playwright/test": "npm:@playwright/test@1.61.1"
+    "@playwright/test": "npm:@playwright/test@1.61.1",
+    "playwright": "npm:playwright@1.61.1"
   },
   "fmt": {
     "exclude": ["assets/htmx-4.0.0.min.js"]

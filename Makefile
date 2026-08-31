@@ -14,7 +14,7 @@ LOCAL_OIDC_ISSUER = http://127.0.0.1:$(IDP_PORT)
 
 dev:
 	@test -f .env || { echo "Copy .env.example to .env and fill it in."; exit 1; }
-	@cargo run --bin food
+	@topcoat dev --bin food
 
 devi:
 	@$(MAKE) --no-print-directory -j2 watch-local-app watch-idp
@@ -29,7 +29,7 @@ watch-local-app:
 	OIDC_CLIENT_SECRET="$(DEV_OIDC_CLIENT_SECRET)" \
 	SESSION_ENCRYPTION_KEY="$(DEV_SESSION_ENCRYPTION_KEY)" \
 	ALLOW_INSECURE_OIDC=1 \
-	cargo run --bin food
+	topcoat dev --bin food
 
 watch-idp:
 	@PORT="$(IDP_PORT)" APP_URL="$(LOCAL_APP_URL)" \
@@ -39,7 +39,8 @@ watch-idp:
 	cargo run --bin dev_idp
 
 build:
-	@cargo build --bins
+	@topcoat asset bundle --bin food
+	@cargo build --bin dev_idp
 
 check:
 	@cargo fmt --check

@@ -206,7 +206,7 @@ async fn authorize(cx: &Cx) -> Result<Response> {
     let bob = authorize_url(provider, query, "bob")?;
     view! {
         <!DOCTYPE html>
-        <html lang="en">
+        <html lang="en" style="color-scheme: light dark">
             <head>
                 <meta charset="utf-8">
                 <meta name="viewport" content="width=device-width, initial-scale=1">

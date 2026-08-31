@@ -27,6 +27,7 @@
             pkgs.clippy
             pkgs.otel-tui
             pkgs.rust-analyzer
+            pkgs.topcoat-cli
           ];
           RUST_SRC_PATH = "${pkgs.rustPlatform.rustLibSrc}";
 

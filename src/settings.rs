@@ -12,10 +12,14 @@ use topcoat::{
         response::{IntoResponse, Response},
         route,
     },
-    view::view,
+    view::{attributes, view},
 };
 
-use crate::{auth, data::Data};
+use crate::{
+    auth,
+    components::{button::button, input::input},
+    data::Data,
+};
 
 pub fn register(builder: RouterBuilder) -> RouterBuilder {
     builder.page(settings).route(save_settings)
@@ -50,54 +54,61 @@ async fn settings(cx: &Cx) -> Result {
     let timezone = user.timezone.as_deref().unwrap_or_default();
 
     view! {
-        <main>
-            <h1>"Settings"</h1>
-            if !user.has_settings() {
-                <p>"Choose your locale and timezone to continue."</p>
-            }
+        <main class="mx-auto max-w-xl px-7 py-10">
+            <header class="mb-8">
+                <h1 class="mt-1 text-2xl font-semibold tracking-tight">"Settings"</h1>
+                if !user.has_settings() {
+                    <p class="mt-3 text-sm text-gray-600 dark:text-gray-400">
+                        "Choose your locale and timezone to continue."
+                    </p>
+                }
+            </header>
             <form
                 method="post"
                 action="/settings"
                 hx-boost="true"
                 hx-target="#app"
                 hx-swap="outerHTML"
+                class="space-y-5"
             >
                 <input type="hidden" name="return_to" value=(return_to)>
 
-                <p>
-                    <label for="locale">"Locale"</label>
-                    <input
+                input(
+                    label: Some("Locale"),
+                    attrs: attributes! {
                         id="locale"
                         name="locale"
                         value=(locale)
                         placeholder="en-US"
                         autocomplete="language"
                         required="true"
-                    >
-                </p>
+                    },
+                )
 
-                <p>
-                    <label for="timezone">"Timezone"</label>
-                    <input
-                        id="timezone"
-                        name="timezone"
-                        value=(timezone)
-                        placeholder="Europe/Helsinki"
-                        autocomplete="off"
-                        list="timezones"
-                        required="true"
-                    >
+                <div>
+                    input(
+                        label: Some("Timezone"),
+                        attrs: attributes! {
+                            id="timezone"
+                            name="timezone"
+                            value=(timezone)
+                            placeholder="Europe/Helsinki"
+                            autocomplete="off"
+                            list="timezones"
+                            required="true"
+                        },
+                    )
                     <datalist id="timezones">
                         for timezone in TZ_VARIANTS.iter() {
                             <option value=(timezone.name())></option>
                         }
                     </datalist>
-                </p>
+                </div>
 
-                <p id="device-settings-hint" hidden="true">
+                <p id="device-settings-hint" hidden="true" class="text-sm text-gray-500 dark:text-gray-400">
                     "Suggested from this device."
                 </p>
-                <button type="submit">"Save"</button>
+                button(attrs: attributes! { class="float-right" }, "Save")
             </form>
         </main>
     }
@@ -105,14 +116,14 @@ async fn settings(cx: &Cx) -> Result {
 
 #[route(POST "/settings")]
 #[tracing::instrument(name = "settings::save_settings", level = "debug", skip_all)]
-async fn save_settings(cx: &Cx, Form(input): Form<SettingsForm>) -> Result<Response> {
+async fn save_settings(cx: &Cx, Form(form): Form<SettingsForm>) -> Result<Response> {
     let user = auth::require_user(cx).await?;
     let locale =
-        LanguageTag::parse(input.locale.trim()).map_err(|_| bad_request("invalid locale"))?;
+        LanguageTag::parse(form.locale.trim()).map_err(|_| bad_request("invalid locale"))?;
     locale
         .validate()
         .map_err(|_| bad_request("invalid locale"))?;
-    let timezone = input
+    let timezone = form
         .timezone
         .trim()
         .parse::<Tz>()
@@ -120,7 +131,7 @@ async fn save_settings(cx: &Cx, Form(input): Form<SettingsForm>) -> Result<Respo
     let return_to = if user.has_settings() {
         "/settings".to_owned()
     } else {
-        safe_return_to(Some(&input.return_to))
+        safe_return_to(Some(&form.return_to))
     };
 
     data(cx)
