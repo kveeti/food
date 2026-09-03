@@ -4,9 +4,11 @@ mod auth;
 mod components;
 mod config;
 mod data;
+mod day;
 mod http;
 mod settings;
 mod telemetry;
+mod water;
 
 use std::sync::Arc;
 
@@ -42,6 +44,7 @@ async fn run(exports_otlp: bool) -> Result<()> {
     let builder = assets::register(builder);
     let builder = app::register(builder);
     let builder = settings::register(builder);
+    let builder = water::register(builder);
     let builder = auth::routes::register(builder);
 
     tracing::info!(app_url = %config.app_url, "starting Food");

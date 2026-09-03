@@ -1,8 +1,14 @@
+use chrono_tz::Tz;
 use topcoat::{
     Result,
-    context::Cx,
+    context::{Cx, app_context},
     htmx::hx_request,
-    router::{RouterBuilder, error::redirect, layout, page, request::uri},
+    router::{
+        RouterBuilder,
+        error::{bad_request, redirect},
+        layout, page,
+        request::uri,
+    },
     tailwind,
     view::{class, view},
 };
@@ -10,7 +16,10 @@ use topcoat::{
 use crate::{
     auth,
     components::button::{ButtonVariant, button},
+    data::Data,
+    day::{Day, day_navigation},
     settings,
+    water::water_section,
 };
 
 pub fn register(builder: RouterBuilder) -> RouterBuilder {
@@ -29,7 +38,9 @@ async fn root_layout(cx: &Cx, slot: Result) -> Result {
     let app = view! {
         <div id="app" class="min-h-screen">
             if show_navigation {
-                <nav class="h-9 bg-gray-100/80 text-gray-950 backdrop-blur-md dark:bg-gray-900/80 dark:text-gray-100">
+                <nav
+                    class="h-9 bg-gray-100/80 text-gray-950 backdrop-blur-md dark:bg-gray-900/80 dark:text-gray-100"
+                >
                     <div class="mx-auto flex h-full max-w-xl items-stretch px-4">
                         if !forced_settings {
                             <a
@@ -89,9 +100,14 @@ async fn root_layout(cx: &Cx, slot: Result) -> Result {
                 <script defer="true" src="/assets/htmx-4.0.0.min.js"></script>
                 <script defer="true" src="/assets/hx-optimistic.js"></script>
                 <script defer="true" src="/assets/settings.js"></script>
+                <script defer="true" src="/assets/water.js"></script>
                 topcoat::dev::script()
             </head>
-            <body class="min-h-screen bg-gray-50 font-sans text-gray-950 antialiased dark:bg-gray-950 dark:text-gray-100">(app)</body>
+            <body
+                class="min-h-screen bg-gray-50 font-sans text-gray-950 antialiased dark:bg-gray-950 dark:text-gray-100"
+            >
+                (app)
+            </body>
         </html>
     }
 }
@@ -105,9 +121,26 @@ async fn home(cx: &Cx) -> Result {
         return Err(redirect(settings::setup_url(return_to)).into());
     }
 
+    let timezone_name = user.timezone.as_deref().unwrap_or_default();
+    let timezone = timezone_name
+        .parse::<Tz>()
+        .map_err(|_| bad_request("invalid user timezone"))?;
+    let day = Day::from_request(cx, timezone)?;
+    let water_total = data(cx)
+        .water_total(user.id, day.date, timezone_name)
+        .await?;
+
     view! {
-        <main class="mx-auto max-w-xl px-7 py-10">
-            <p class="mt-3 text-gray-600 dark:text-gray-400">(user.email.as_deref().unwrap_or("Signed in"))</p>
+        <main class="mx-auto max-w-xl px-7 py-8">
+            day_navigation(day: day)
+            <p class="mt-3 text-center text-sm text-gray-500 dark:text-gray-400">
+                (user.email.as_deref().unwrap_or("Signed in"))
+            </p>
+            water_section(day: day, total: water_total)
         </main>
     }
+}
+
+fn data(cx: &Cx) -> &Data {
+    app_context(cx)
 }

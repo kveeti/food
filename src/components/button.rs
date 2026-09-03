@@ -7,6 +7,7 @@ use topcoat::{
 pub enum ButtonVariant {
     #[default]
     Primary,
+    Accent,
     Nav,
 }
 
@@ -18,6 +19,11 @@ impl ButtonVariant {
                  outline-2 outline-transparent outline-offset-2 hover:bg-gray-700 \
                  focus-visible:outline-outline dark:bg-gray-100 dark:text-gray-950 \
                  dark:hover:bg-white",
+            ),
+            Self::Accent => class!(
+                "css-squircle-button h-12 bg-water px-5 text-sm font-medium text-blue-950 \
+                 outline-2 outline-transparent outline-offset-2 hover:bg-water-hover \
+                 focus-visible:outline-outline",
             ),
             Self::Nav => class!(
                 "inline-flex h-full items-center px-3 text-sm text-inherit outline-2 \

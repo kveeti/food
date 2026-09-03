@@ -12,6 +12,8 @@
   --color-gray-800: var(--color-neutral-800);
   --color-gray-900: var(--color-neutral-900);
   --color-gray-950: var(--color-neutral-950);
+  --color-water: oklch(0.81 0.14 252);
+  --color-water-hover: oklch(0.75 0.16 252);
   --color-outline: var(--outline-color);
 }
 
@@ -28,4 +30,187 @@
 html {
   color-scheme: light dark;
   -webkit-font-smoothing: antialiased;
+}
+
+.css-squircle-button {
+  border-radius: 12px;
+}
+
+@supports (corner-shape: squircle) {
+  .css-squircle-button {
+    border-radius: 22px;
+    corner-shape: squircle;
+  }
+}
+
+.water-vessel {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1;
+  touch-action: none;
+  cursor: pointer;
+  opacity: 0.68;
+  offset-anchor: 50% 0;
+  offset-distance: 100%;
+  offset-path: path("M 96 0 C 110 48 110 272 96 320");
+  offset-rotate: 0deg;
+  transform: scale(0.3);
+  transform-origin: top center;
+  transition:
+    offset-distance 360ms cubic-bezier(0.16, 1, 0.3, 1),
+    transform 360ms cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.water-vessel[data-selected="true"] {
+  z-index: 2;
+  cursor: ns-resize;
+  opacity: 1;
+  offset-distance: 0%;
+  offset-path: path("M 96 0 C 82 48 82 272 96 320");
+  transform: scale(1);
+}
+
+.water-vessel:hover {
+  opacity: 1;
+}
+
+.water-vessel-outline {
+  fill: color-mix(in oklab, var(--color-gray-200) 55%, transparent);
+  stroke: none;
+}
+
+.water-wave {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.water-wave-back {
+  fill: color-mix(in oklab, var(--color-water) 45%, transparent);
+  animation: water-wave-back 4s linear infinite reverse;
+}
+
+.water-wave-front {
+  fill: var(--color-water);
+  animation: water-wave-front 3s linear infinite;
+}
+
+.water-bubble-path {
+  animation: water-bubble-rise var(--bubble-duration) linear infinite;
+  animation-delay: var(--bubble-delay);
+  transform-box: view-box;
+}
+
+.water-bubble {
+  fill: rgb(255 255 255 / 0.42);
+  opacity: 0;
+  animation: water-bubble-pop var(--bubble-duration) linear infinite;
+  animation-delay: var(--bubble-delay);
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.water-bubble-one {
+  --bubble-duration: 3.8s;
+  --bubble-start: 205px;
+  --bubble-drift: 5px;
+  --bubble-delay: -1.4s;
+}
+
+.water-bubble-two {
+  --bubble-duration: 4.7s;
+  --bubble-start: 216px;
+  --bubble-drift: -4px;
+  --bubble-delay: -3.2s;
+}
+
+.water-bubble-three {
+  --bubble-duration: 3.3s;
+  --bubble-start: 190px;
+  --bubble-drift: 3px;
+  --bubble-delay: -2.1s;
+}
+
+.water-bubble-four {
+  --bubble-duration: 5.2s;
+  --bubble-start: 220px;
+  --bubble-drift: 6px;
+  --bubble-delay: -4.4s;
+}
+
+.water-bubble-five {
+  --bubble-duration: 4.1s;
+  --bubble-start: 198px;
+  --bubble-drift: -3px;
+  --bubble-delay: -0.7s;
+}
+
+@media (prefers-color-scheme: dark) {
+  .water-vessel-outline {
+    fill: color-mix(in oklab, var(--color-gray-800) 55%, transparent);
+  }
+
+  .water-wave-back {
+    fill: color-mix(in oklab, var(--color-water) 38%, transparent);
+  }
+}
+
+@keyframes water-wave-front {
+  to {
+    transform: translateX(192px);
+  }
+}
+
+@keyframes water-wave-back {
+  to {
+    transform: translateX(192px);
+  }
+}
+
+@keyframes water-bubble-rise {
+  from {
+    transform: translate(0, var(--bubble-start));
+  }
+
+  to {
+    transform: translate(var(--bubble-drift), -6px);
+  }
+}
+
+@keyframes water-bubble-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.65);
+  }
+
+  8% {
+    opacity: 0.45;
+    transform: scale(1);
+  }
+
+  85% {
+    opacity: 0.35;
+    transform: scale(1);
+  }
+
+  100% {
+    opacity: 0;
+    transform: scale(0.65);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .water-vessel {
+    transition: none;
+  }
+
+  .water-wave-back,
+  .water-wave-front {
+    animation: none;
+  }
+
+  .water-bubble {
+    display: none;
+  }
 }

@@ -1,7 +1,7 @@
 use std::{future::Future, time::Duration};
 
 use anyhow::Result;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, NaiveDate, Utc};
 use sqlx::{PgPool, migrate::MigrateError, types::Uuid};
 
 #[derive(Clone)]
@@ -150,6 +150,63 @@ impl Data {
         .execute(&self.pool)
         .await?;
         Ok(())
+    }
+
+    #[tracing::instrument(name = "data::water_total", level = "debug", skip_all)]
+    pub async fn water_total(&self, user_id: Uuid, date: NaiveDate, timezone: &str) -> Result<i64> {
+        Ok(sqlx::query_scalar(
+            "SELECT COALESCE(SUM(amount_ml), 0)::bigint
+             FROM water_entries
+             WHERE user_id = $1
+               AND consumed_at >= ($2::date::timestamp AT TIME ZONE $3)
+               AND consumed_at < (($2::date + 1)::timestamp AT TIME ZONE $3)",
+        )
+        .bind(user_id)
+        .bind(date)
+        .bind(timezone)
+        .fetch_one(&self.pool)
+        .await?)
+    }
+
+    #[tracing::instrument(name = "data::add_water", level = "debug", skip_all)]
+    pub async fn add_water(
+        &self,
+        user_id: Uuid,
+        amount_ml: i32,
+        date: NaiveDate,
+        timezone: &str,
+    ) -> Result<i64> {
+        let mut transaction = self.pool.begin().await?;
+        sqlx::query(
+            "INSERT INTO water_entries (id, user_id, amount_ml, consumed_at)
+             VALUES (
+                 $1,
+                 $2,
+                 $3,
+                 (($4::date + (now() AT TIME ZONE $5)::time)::timestamp AT TIME ZONE $5)
+             )",
+        )
+        .bind(Uuid::now_v7())
+        .bind(user_id)
+        .bind(amount_ml)
+        .bind(date)
+        .bind(timezone)
+        .execute(&mut *transaction)
+        .await?;
+        let total = sqlx::query_scalar(
+            "SELECT COALESCE(SUM(amount_ml), 0)::bigint
+             FROM water_entries
+             WHERE user_id = $1
+               AND consumed_at >= ($2::date::timestamp AT TIME ZONE $3)
+               AND consumed_at < (($2::date + 1)::timestamp AT TIME ZONE $3)",
+        )
+        .bind(user_id)
+        .bind(date)
+        .bind(timezone)
+        .fetch_one(&mut *transaction)
+        .await?;
+        transaction.commit().await?;
+        Ok(total)
     }
 
     #[tracing::instrument(name = "data::delete_session", level = "debug", skip_all)]
