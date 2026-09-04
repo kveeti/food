@@ -82,9 +82,8 @@ async fn settings(cx: &Cx) -> Result {
                         placeholder="en-US"
                         autocomplete="language"
                         required="true"
-                    },
+                    }
                 )
-
                 <div>
                     input(
                         label: Some("Timezone"),
@@ -96,7 +95,7 @@ async fn settings(cx: &Cx) -> Result {
                             autocomplete="off"
                             list="timezones"
                             required="true"
-                        },
+                        }
                     )
                     <datalist id="timezones">
                         for timezone in TZ_VARIANTS.iter() {
@@ -105,7 +104,11 @@ async fn settings(cx: &Cx) -> Result {
                     </datalist>
                 </div>
 
-                <p id="device-settings-hint" hidden="true" class="text-sm text-gray-500 dark:text-gray-400">
+                <p
+                    id="device-settings-hint"
+                    hidden="true"
+                    class="text-sm text-gray-500 dark:text-gray-400"
+                >
                     "Suggested from this device."
                 </p>
                 button(attrs: attributes! { class="float-right" }, "Save")

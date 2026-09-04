@@ -43,6 +43,7 @@ build:
 	@cargo build --bin dev_idp
 
 check:
+	@topcoat fmt
 	@cargo fmt --check
 	@cargo test --bins
 	@cargo clippy --bins -- -D warnings
@@ -52,5 +53,6 @@ e2e:
 	@deno task e2e
 
 fmt:
+	@topcoat fmt
 	@cargo fmt
 	@deno fmt

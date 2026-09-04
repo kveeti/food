@@ -12,9 +12,7 @@ const INPUT: StaticClass = class!(
 
 #[component]
 pub async fn input(#[default] label: Option<&str>, #[default] mut attrs: Attributes) -> Result {
-    let control = view! {
-        <input class=(class!(INPUT, attrs.remove("class"))) (attrs)>
-    }?;
+    let control = view! { <input class=(class!(INPUT, attrs.remove("class"))) (attrs)> }?;
 
     view! {
         if let Some(label) = label {

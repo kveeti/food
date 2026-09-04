@@ -95,7 +95,6 @@ pub async fn water_section(day: Day, total: i64) -> Result {
                 water_total(total: total)
             </header>
 
-
             <form
                 method="post"
                 action="/water"
@@ -113,7 +112,9 @@ pub async fn water_section(day: Day, total: i64) -> Result {
                     value="250"
                 >
                 <noscript>
-                    <style>"[data-water-stage], [data-water-output] { display: none; }"</style>
+                    <style>
+                        "[data-water-stage], [data-water-output] { display: none; }"
+                    </style>
                     <div class="w-full max-w-xs">
                         input(
                             label: Some("Amount (ml)"),
@@ -192,11 +193,21 @@ pub async fn water_section(day: Day, total: i64) -> Result {
                                 </g>
                                 <g clip-path="url(#glass-bubble-clip)">
                                     <g class="water-bubbles">
-                                        <g class="water-bubble-path water-bubble-one"><circle class="water-bubble" cx="35" cy="0" r="2.5"></circle></g>
-                                        <g class="water-bubble-path water-bubble-two"><circle class="water-bubble" cx="66" cy="0" r="2"></circle></g>
-                                        <g class="water-bubble-path water-bubble-three"><circle class="water-bubble" cx="98" cy="0" r="3"></circle></g>
-                                        <g class="water-bubble-path water-bubble-four"><circle class="water-bubble" cx="51" cy="0" r="2.5"></circle></g>
-                                        <g class="water-bubble-path water-bubble-five"><circle class="water-bubble" cx="84" cy="0" r="1.75"></circle></g>
+                                        <g class="water-bubble-path water-bubble-one">
+                                            <circle class="water-bubble" cx="35" cy="0" r="2.5"></circle>
+                                        </g>
+                                        <g class="water-bubble-path water-bubble-two">
+                                            <circle class="water-bubble" cx="66" cy="0" r="2"></circle>
+                                        </g>
+                                        <g class="water-bubble-path water-bubble-three">
+                                            <circle class="water-bubble" cx="98" cy="0" r="3"></circle>
+                                        </g>
+                                        <g class="water-bubble-path water-bubble-four">
+                                            <circle class="water-bubble" cx="51" cy="0" r="2.5"></circle>
+                                        </g>
+                                        <g class="water-bubble-path water-bubble-five">
+                                            <circle class="water-bubble" cx="84" cy="0" r="1.75"></circle>
+                                        </g>
                                     </g>
                                 </g>
                             </g>
@@ -263,11 +274,21 @@ pub async fn water_section(day: Day, total: i64) -> Result {
                                 </g>
                                 <g clip-path="url(#bottle-bubble-clip)">
                                     <g class="water-bubbles">
-                                        <g class="water-bubble-path water-bubble-one"><circle class="water-bubble" cx="35" cy="0" r="2.5"></circle></g>
-                                        <g class="water-bubble-path water-bubble-two"><circle class="water-bubble" cx="66" cy="0" r="2"></circle></g>
-                                        <g class="water-bubble-path water-bubble-three"><circle class="water-bubble" cx="98" cy="0" r="3"></circle></g>
-                                        <g class="water-bubble-path water-bubble-four"><circle class="water-bubble" cx="51" cy="0" r="2.5"></circle></g>
-                                        <g class="water-bubble-path water-bubble-five"><circle class="water-bubble" cx="84" cy="0" r="1.75"></circle></g>
+                                        <g class="water-bubble-path water-bubble-one">
+                                            <circle class="water-bubble" cx="35" cy="0" r="2.5"></circle>
+                                        </g>
+                                        <g class="water-bubble-path water-bubble-two">
+                                            <circle class="water-bubble" cx="66" cy="0" r="2"></circle>
+                                        </g>
+                                        <g class="water-bubble-path water-bubble-three">
+                                            <circle class="water-bubble" cx="98" cy="0" r="3"></circle>
+                                        </g>
+                                        <g class="water-bubble-path water-bubble-four">
+                                            <circle class="water-bubble" cx="51" cy="0" r="2.5"></circle>
+                                        </g>
+                                        <g class="water-bubble-path water-bubble-five">
+                                            <circle class="water-bubble" cx="84" cy="0" r="1.75"></circle>
+                                        </g>
                                     </g>
                                 </g>
                             </g>
