@@ -336,6 +336,15 @@ impl<'a> ImportWriter<'a> {
         .bind(self.source)
         .execute(&mut *transaction)
         .await?;
+        sqlx::query(
+            "SELECT refresh_food_search_vector(foods.id)
+             FROM foods
+             JOIN import_foods staged ON staged.source_id = foods.source_id
+             WHERE foods.source = $1",
+        )
+        .bind(self.source)
+        .execute(&mut *transaction)
+        .await?;
 
         match self.mode {
             ImportMode::Full {

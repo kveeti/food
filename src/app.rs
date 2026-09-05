@@ -18,6 +18,7 @@ use crate::{
     components::button::{ButtonVariant, button},
     data::Data,
     day::{Day, day_navigation},
+    food::{self, FoodLog, food_log, food_search},
     settings,
     water::water_section,
 };
@@ -99,6 +100,8 @@ async fn root_layout(cx: &Cx, slot: Result) -> Result {
                 <link rel="stylesheet" href=(tailwind::stylesheet!())>
                 <script defer="true" src="/assets/htmx-4.0.0.min.js"></script>
                 <script defer="true" src="/assets/hx-optimistic.js"></script>
+                <script defer="true" src="/assets/combobox.js"></script>
+                <script defer="true" src="/assets/food.js"></script>
                 <script defer="true" src="/assets/settings.js"></script>
                 <script defer="true" src="/assets/water.js"></script>
                 topcoat::dev::script()
@@ -129,6 +132,19 @@ async fn home(cx: &Cx) -> Result {
     let water_total = data(cx)
         .water_total(user.id, day.date, timezone_name)
         .await?;
+    let food_search_state = food::load(cx, user.id, day, timezone_name).await?;
+    let diary = data(cx)
+        .food_diary(user.id, day.date, timezone_name)
+        .await?;
+    let food_log_state = FoodLog {
+        preview: food_search_state.preview.as_ref(),
+        meal_choice: food_search_state.meal_choice.as_ref(),
+        query: &food_search_state.query,
+        day,
+        diary: &diary,
+        timezone,
+        added: false,
+    };
 
     view! {
         <main class="mx-auto max-w-xl px-7 py-8">
@@ -136,6 +152,8 @@ async fn home(cx: &Cx) -> Result {
             <p class="mt-3 text-center text-sm text-gray-500 dark:text-gray-400">
                 (user.email.as_deref().unwrap_or("Signed in"))
             </p>
+            food_search(state: &food_search_state, day: day)
+            food_log(state: &food_log_state)
             water_section(day: day, total: water_total)
         </main>
     }

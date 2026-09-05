@@ -32,6 +32,16 @@ html {
   -webkit-font-smoothing: antialiased;
 }
 
+/* Native popovers leave normal layout, so placement belongs to combobox behavior. */
+[data-combobox-popup][popover] {
+  position: fixed;
+  inset: auto;
+  top: anchor(bottom);
+  left: anchor(left);
+  width: anchor-size(width);
+  position-try-fallbacks: flip-block;
+}
+
 .css-squircle-button {
   border-radius: 12px;
 }

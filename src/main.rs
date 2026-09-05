@@ -5,6 +5,7 @@ mod components;
 mod config;
 mod data;
 mod day;
+mod food;
 mod http;
 mod settings;
 mod telemetry;
@@ -43,6 +44,7 @@ async fn run(exports_otlp: bool) -> Result<()> {
     let builder = http::register(builder, exports_otlp);
     let builder = assets::register(builder);
     let builder = app::register(builder);
+    let builder = food::register(builder);
     let builder = settings::register(builder);
     let builder = water::register(builder);
     let builder = auth::routes::register(builder);

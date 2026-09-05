@@ -318,7 +318,8 @@ fn unit_factor(
 fn nutrient_priority(source_key: &str) -> u8 {
     match source_key {
         "energy-kj" => 3,
-        "energy" => 2,
+        "energy-kcal" => 2,
+        "energy" => 1,
         _ => 1,
     }
 }
@@ -395,6 +396,25 @@ mod tests {
         .unwrap();
         assert!((food.nutrients["energy"] - 418.4).abs() < 0.000_001);
         assert_eq!(food.nutrients["protein"], 2.0);
+    }
+
+    #[test]
+    fn explicit_legacy_energy_wins_over_a_conflicting_generic_value() {
+        let food = parse(
+            r#"{
+                "code":"6420256010815",
+                "product_name":"Karkki tvmix",
+                "nutrition_data_per":"100g",
+                "nutriments":{
+                    "energy_100g":1506,
+                    "energy_unit":"kcal",
+                    "energy-kcal_100g":360,
+                    "energy-kcal_unit":"kcal"
+                }
+            }"#,
+        )
+        .unwrap();
+        assert!((food.nutrients["energy"] - 1506.24).abs() < 0.000_001);
     }
 
     #[test]

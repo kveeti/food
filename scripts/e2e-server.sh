@@ -69,6 +69,46 @@ done
   exit 1
 }
 
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 >/dev/null <<'SQL'
+INSERT INTO foods (id, source, source_id, display_name, brand, basis_unit, source_data)
+VALUES
+  ('00000000-0000-7000-8000-000000000101', 'fineli', 'test-milk',
+   'Maito, rasvaton', NULL, 'g', '{"food_type":"FOOD","process":"IND"}'),
+  ('00000000-0000-7000-8000-000000000102', 'open_food_facts', '6411401015098',
+   'Karl Fazer Maitosuklaa', 'Fazer', 'g', '{}'),
+  ('00000000-0000-7000-8000-000000000103', 'fineli', 'test-apple',
+   'Omena, keskiarvo', NULL, 'g', '{"food_type":"FOOD","process":"RAW"}');
+
+INSERT INTO food_names (food_id, name, locale)
+VALUES
+  ('00000000-0000-7000-8000-000000000101', 'Maito, rasvaton', 'fi'),
+  ('00000000-0000-7000-8000-000000000101', 'Skim milk', 'en'),
+  ('00000000-0000-7000-8000-000000000101', 'Skummjölk', 'sv'),
+  ('00000000-0000-7000-8000-000000000102', 'Milk chocolate', 'en'),
+  ('00000000-0000-7000-8000-000000000103', 'Omena', 'fi'),
+  ('00000000-0000-7000-8000-000000000103', 'Apple', 'en'),
+  ('00000000-0000-7000-8000-000000000103', 'Äpple', 'sv');
+
+INSERT INTO food_nutrients (food_id, nutrient_id, value)
+SELECT food_id, nutrients.id, value
+FROM (VALUES
+  ('00000000-0000-7000-8000-000000000101'::uuid, 'energy', 146.0),
+  ('00000000-0000-7000-8000-000000000101'::uuid, 'protein', 3.5),
+  ('00000000-0000-7000-8000-000000000101'::uuid, 'carbohydrate', 4.8),
+  ('00000000-0000-7000-8000-000000000101'::uuid, 'fat', 0.1),
+  ('00000000-0000-7000-8000-000000000101'::uuid, 'sodium', 0.04),
+  ('00000000-0000-7000-8000-000000000102'::uuid, 'energy', 2250.0),
+  ('00000000-0000-7000-8000-000000000102'::uuid, 'protein', 8.1),
+  ('00000000-0000-7000-8000-000000000102'::uuid, 'carbohydrate', 49.0),
+  ('00000000-0000-7000-8000-000000000102'::uuid, 'fat', 31.0),
+  ('00000000-0000-7000-8000-000000000103'::uuid, 'energy', 185.0),
+  ('00000000-0000-7000-8000-000000000103'::uuid, 'fibre', 2.4)
+) AS values(food_id, nutrient_code, value)
+JOIN nutrients ON nutrients.code = values.nutrient_code;
+
+SELECT refresh_food_search_vector(id) FROM foods;
+SQL
+
 PORT=8202 "$root/target/debug/food" >"$tmp/replica.log" 2>&1 &
 replica_pid=$!
 for _ in {1..200}; do

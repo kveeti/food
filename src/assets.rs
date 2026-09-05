@@ -10,6 +10,8 @@ use topcoat::{
 
 const HTMX: &[u8] = include_bytes!("../assets/htmx-4.0.0.min.js");
 const HX_OPTIMISTIC: &[u8] = include_bytes!("../assets/hx-optimistic.js");
+const COMBOBOX: &[u8] = include_bytes!("../assets/combobox.js");
+const FOOD: &[u8] = include_bytes!("../assets/food.js");
 const SETTINGS: &[u8] = include_bytes!("../assets/settings.js");
 const WATER: &[u8] = include_bytes!("../assets/water.js");
 
@@ -17,6 +19,8 @@ pub fn register(builder: RouterBuilder) -> RouterBuilder {
     builder
         .route(htmx)
         .route(hx_optimistic)
+        .route(combobox)
+        .route(food)
         .route(settings)
         .route(water)
 }
@@ -29,6 +33,16 @@ async fn htmx(cx: &Cx) -> Result<Response> {
 #[route(GET "/assets/hx-optimistic.js")]
 async fn hx_optimistic(cx: &Cx) -> Result<Response> {
     javascript(cx, HX_OPTIMISTIC, "no-cache")
+}
+
+#[route(GET "/assets/combobox.js")]
+async fn combobox(cx: &Cx) -> Result<Response> {
+    javascript(cx, COMBOBOX, "no-cache")
+}
+
+#[route(GET "/assets/food.js")]
+async fn food(cx: &Cx) -> Result<Response> {
+    javascript(cx, FOOD, "no-cache")
 }
 
 #[route(GET "/assets/settings.js")]
