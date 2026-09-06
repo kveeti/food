@@ -8,7 +8,9 @@ aes-gcm = "0.10"
 anyhow = "1"
 base64 = "0.22"
 chrono = { version = "0.4", features = ["serde"] }
+chrono-tz = "0.10"
 jsonwebtoken = { version = "9.3", default-features = false }
+language-tags = "0.3"
 opentelemetry = "0.32"
 opentelemetry-otlp = { version = "0.32", default-features = false, features = ["grpc-tonic", "trace"] }
 opentelemetry_sdk = { version = "0.32", features = ["rt-tokio"] }

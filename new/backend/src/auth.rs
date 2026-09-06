@@ -46,6 +46,8 @@ pub struct Auth {
 pub struct User {
     pub id: Uuid,
     pub email: Option<String>,
+    pub locale: Option<String>,
+    pub timezone: Option<String>,
 }
 
 struct Authenticated {
@@ -272,6 +274,8 @@ async fn refresh_session(
                 user: User {
                     id: session.user_id,
                     email: session.email,
+                    locale: session.locale,
+                    timezone: session.timezone,
                 },
                 expires_at: tokens.refresh_expires_at,
             };
@@ -327,6 +331,8 @@ fn authenticated(session: &Session) -> Authenticated {
         user: User {
             id: session.user_id,
             email: session.email.to_owned(),
+            locale: session.locale.to_owned(),
+            timezone: session.timezone.to_owned(),
         },
         expires_at: session.refresh_expires_at,
     }

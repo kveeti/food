@@ -1,20 +1,42 @@
+mod settings;
+mod water;
+
 use serde::Serialize;
 use topcoat::{
     Result,
-    context::Cx,
-    router::{RouterBuilder, content::Json, route},
+    context::{Cx, app_context},
+    router::{RouterBuilder, content::Json, error::service_unavailable, route},
 };
 
-use crate::auth;
+use crate::{auth, data::Data};
+
+#[derive(Serialize)]
+struct Health {
+    status: &'static str,
+}
 
 #[derive(Serialize)]
 struct Me {
     id: String,
     email: Option<String>,
+    locale: Option<String>,
+    timezone: Option<String>,
 }
 
 pub fn register(builder: RouterBuilder) -> RouterBuilder {
-    builder.route(me)
+    let builder = builder.route(health).route(me);
+    let builder = settings::register(builder);
+    water::register(builder)
+}
+
+#[route(GET "/health")]
+#[tracing::instrument(name = "api::health", level = "debug", skip_all)]
+async fn health(cx: &Cx) -> Result<Json<Health>> {
+    if let Err(error) = app_context::<Data>(cx).ping().await {
+        tracing::error!(?error, "database health check failed");
+        return Err(service_unavailable(1).into());
+    }
+    Ok(Json(Health { status: "ok" }))
 }
 
 #[route(GET "/api/me")]
@@ -24,5 +46,7 @@ async fn me(cx: &Cx) -> Result<Json<Me>> {
     Ok(Json(Me {
         id: user.id.to_string(),
         email: user.email,
+        locale: user.locale,
+        timezone: user.timezone,
     }))
 }

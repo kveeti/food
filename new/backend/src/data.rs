@@ -1,12 +1,19 @@
 use std::{future::Future, time::Duration};
 
 use anyhow::Result;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, NaiveDate, Utc};
 use sqlx::{PgPool, migrate::MigrateError, types::Uuid};
 
 #[derive(Clone)]
 pub struct Data {
     pool: PgPool,
+}
+
+#[derive(sqlx::FromRow)]
+pub struct WaterEntry {
+    pub id: Uuid,
+    pub amount_ml: i32,
+    pub consumed_at: DateTime<Utc>,
 }
 
 #[derive(sqlx::FromRow)]
@@ -18,6 +25,8 @@ pub struct Session {
     pub refresh_retry_after: Option<DateTime<Utc>>,
     pub refresh_expires_at: DateTime<Utc>,
     pub email: Option<String>,
+    pub locale: Option<String>,
+    pub timezone: Option<String>,
     pub issuer: String,
     pub subject: String,
 }
@@ -70,6 +79,12 @@ impl Data {
     #[tracing::instrument(name = "data::migrate", level = "info", skip_all)]
     async fn migrate(&self) -> Result<(), MigrateError> {
         sqlx::migrate!().run(&self.pool).await
+    }
+
+    #[tracing::instrument(name = "data::ping", level = "debug", skip_all)]
+    pub async fn ping(&self) -> Result<()> {
+        sqlx::query("SELECT 1").execute(&self.pool).await?;
+        Ok(())
     }
 
     #[tracing::instrument(name = "data::create_session", level = "debug", skip_all)]
@@ -188,6 +203,86 @@ impl Data {
         }
         Ok(())
     }
+
+    #[tracing::instrument(name = "data::save_user_settings", level = "debug", skip_all)]
+    pub async fn save_user_settings(
+        &self,
+        user_id: Uuid,
+        locale: &str,
+        timezone: &str,
+    ) -> Result<()> {
+        sqlx::query(
+            "UPDATE users
+             SET locale = $1, timezone = $2, updated_at = now()
+             WHERE id = $3",
+        )
+        .bind(locale)
+        .bind(timezone)
+        .bind(user_id)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    #[tracing::instrument(name = "data::water_entries", level = "debug", skip_all)]
+    pub async fn water_entries(
+        &self,
+        user_id: Uuid,
+        date: NaiveDate,
+        timezone: &str,
+    ) -> Result<Vec<WaterEntry>> {
+        Ok(sqlx::query_as(
+            "SELECT id, amount_ml, consumed_at
+             FROM water_entries
+             WHERE user_id = $1
+               AND consumed_at >= ($2::date::timestamp AT TIME ZONE $3)
+               AND consumed_at < (($2::date + 1)::timestamp AT TIME ZONE $3)
+             ORDER BY consumed_at DESC, id DESC",
+        )
+        .bind(user_id)
+        .bind(date)
+        .bind(timezone)
+        .fetch_all(&self.pool)
+        .await?)
+    }
+
+    #[tracing::instrument(name = "data::add_water", level = "debug", skip_all)]
+    pub async fn add_water(
+        &self,
+        id: Uuid,
+        user_id: Uuid,
+        amount_ml: i32,
+        date: NaiveDate,
+        timezone: &str,
+    ) -> Result<WaterEntry> {
+        Ok(sqlx::query_as(
+            "INSERT INTO water_entries (id, user_id, amount_ml, consumed_at)
+             VALUES (
+                 $1,
+                 $2,
+                 $3,
+                 (($4::date + (now() AT TIME ZONE $5)::time)::timestamp AT TIME ZONE $5)
+             )
+             RETURNING id, amount_ml, consumed_at",
+        )
+        .bind(id)
+        .bind(user_id)
+        .bind(amount_ml)
+        .bind(date)
+        .bind(timezone)
+        .fetch_one(&self.pool)
+        .await?)
+    }
+
+    #[tracing::instrument(name = "data::delete_water", level = "debug", skip_all)]
+    pub async fn delete_water(&self, user_id: Uuid, entry_id: Uuid) -> Result<bool> {
+        let result = sqlx::query("DELETE FROM water_entries WHERE id = $1 AND user_id = $2")
+            .bind(entry_id)
+            .bind(user_id)
+            .execute(&self.pool)
+            .await?;
+        Ok(result.rows_affected() == 1)
+    }
 }
 
 impl SessionLock {
@@ -279,6 +374,8 @@ const SESSION_QUERY: &str = "SELECT sessions.id,
             sessions.refresh_retry_after,
             sessions.refresh_expires_at,
             users.email,
+            users.locale,
+            users.timezone,
             users.issuer,
             users.subject
      FROM sessions

@@ -12,7 +12,7 @@ BACKEND_URL = http://127.0.0.1:$(BACKEND_PORT)
 LOCAL_APP_URL = http://127.0.0.1:$(FRONTEND_PORT)
 LOCAL_OIDC_ISSUER = http://127.0.0.1:$(IDP_PORT)
 
-.PHONY: frontend backend dev-idp dev devi build check fmt
+.PHONY: frontend backend dev-idp dev devi build check e2e fmt
 MAKEFLAGS += -j
 
 frontend/node_modules/.modules.yaml: frontend/package.json frontend/pnpm-lock.yaml
@@ -46,6 +46,10 @@ check: frontend/node_modules/.modules.yaml
 	@cargo test --manifest-path backend/Cargo.toml --bins
 	@cargo clippy --manifest-path backend/Cargo.toml --bins -- -D warnings
 	@cd frontend && pnpm run fmt:check && pnpm run lint && pnpm run typecheck
+
+# Each Playwright test gets a new database on the dev-shell PostgreSQL server.
+e2e: frontend/node_modules/.modules.yaml
+	@cd frontend && pnpm run e2e
 
 fmt: frontend/node_modules/.modules.yaml
 	@cargo fmt --manifest-path backend/Cargo.toml

@@ -1,14 +1,10 @@
-import babel from "@rolldown/plugin-babel";
 import tailwindcss from "@tailwindcss/vite";
-import react, { reactCompilerPreset } from "@vitejs/plugin-react";
+import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
 export default defineConfig({
-  plugins: [
-    react(),
-    babel({ presets: [reactCompilerPreset()] }),
-    tailwindcss(),
-  ],
+  cacheDir: process.env.VITE_CACHE_DIR ?? "node_modules/.vite",
+  plugins: [react(), tailwindcss()],
   server: {
     host: "127.0.0.1",
     port: Number(process.env.VITE_PORT ?? 3000),

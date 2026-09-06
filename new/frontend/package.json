@@ -6,31 +6,31 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "e2e": "playwright test",
     "lint": "oxlint",
     "fmt": "oxfmt",
     "fmt:check": "oxfmt --check",
     "typecheck": "tsc -b --noEmit"
   },
   "dependencies": {
+    "@formisch/react": "1.0.0-rc.0",
     "@tanstack/react-query": "^5.101.2",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
+    "valibot": "^1.4.2",
     "wouter": "^3.10.0"
   },
   "devDependencies": {
-    "@babel/core": "^7.29.7",
-    "@rolldown/plugin-babel": "^0.2.3",
+    "@playwright/test": "1.61.1",
     "@tailwindcss/vite": "^4.3.3",
-    "@types/babel__core": "^7.20.5",
     "@types/node": "^24.13.2",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
-    "@vitejs/plugin-react": "^6.0.3",
-    "babel-plugin-react-compiler": "^1.0.0",
+    "@vitejs/plugin-react": "^6.1.1",
     "oxfmt": "^0.58.0",
     "oxlint": "^1.71.0",
     "tailwindcss": "^4.3.3",
     "typescript": "~7.0.2",
-    "vite": "^8.1.1"
+    "vite": "^8.2.2"
   }
 }
