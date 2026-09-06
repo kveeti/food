@@ -1,3 +1,6 @@
+import type { ReactNode } from "react";
+
+import { ChevronRightIcon } from "../../ui/chevron-right-icon.tsx";
 import { ImmediateNavLink } from "../../ui/immediate-nav-link.tsx";
 import { useI18n } from "../i18n/use-i18n.tsx";
 
@@ -22,7 +25,7 @@ export function DayNavigation(props: { date: string; today: string }) {
         href={dayUrl(moveDate(props.date, -1), props.today)}
         label="Previous day"
       >
-        ‹
+        <ChevronRightIcon className="rotate-180" />
       </DayLink>
       <div className="text-center">
         <p className="text-sm text-gray-600">{eyebrow}</p>
@@ -34,20 +37,20 @@ export function DayNavigation(props: { date: string; today: string }) {
         href={dayUrl(moveDate(props.date, 1), props.today)}
         label="Next day"
       >
-        ›
+        <ChevronRightIcon />
       </DayLink>
     </header>
   );
 }
 
-function DayLink(props: { href: string; label: string; children: string }) {
+function DayLink(props: { href: string; label: string; children: ReactNode }) {
   return (
     <ImmediateNavLink
       href={props.href}
       aria-label={props.label}
-      className="grid size-10 place-items-center rounded-lg text-xl text-gray-700 outline-2 outline-transparent outline-offset-2 hover:bg-gray-150 focus-visible:outline-gray-500"
+      className="grid size-10 place-items-center rounded-lg text-gray-700 outline-2 outline-transparent outline-offset-2 hover:bg-gray-150 focus-visible:outline-gray-500"
     >
-      <span aria-hidden="true">{props.children}</span>
+      {props.children}
     </ImmediateNavLink>
   );
 }
