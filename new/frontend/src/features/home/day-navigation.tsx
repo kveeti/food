@@ -1,4 +1,5 @@
 import { ImmediateNavLink } from "../../ui/immediate-nav-link.tsx";
+import { useI18n } from "../i18n/use-i18n.tsx";
 
 function moveDate(value: string, days: number) {
   const date = new Date(`${value}T12:00:00Z`);
@@ -10,23 +11,10 @@ function dayUrl(date: string, today: string) {
   return date === today ? "/" : `/?date=${date}`;
 }
 
-export function DayNavigation(props: {
-  date: string;
-  today: string;
-  locale: string;
-}) {
-  const date = new Date(`${props.date}T12:00:00Z`);
-  const title = new Intl.DateTimeFormat(props.locale, {
-    dateStyle: "long",
-    timeZone: "UTC",
-  }).format(date);
-  const eyebrow =
-    props.date === props.today
-      ? "Today"
-      : new Intl.DateTimeFormat(props.locale, {
-          weekday: "long",
-          timeZone: "UTC",
-        }).format(date);
+export function DayNavigation(props: { date: string; today: string }) {
+  const { f } = useI18n();
+  const title = f.dateOnly(props.date);
+  const eyebrow = props.date === props.today ? "Today" : f.weekday(props.date);
 
   return (
     <header className="grid grid-cols-[2.5rem_1fr_2.5rem] items-center gap-2">

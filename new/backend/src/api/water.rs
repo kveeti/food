@@ -25,7 +25,6 @@ struct WaterQuery {
 
 #[derive(Deserialize)]
 struct AddWaterInput {
-    id: String,
     amount_ml: i32,
     date: String,
 }
@@ -67,14 +66,10 @@ async fn add(cx: &Cx, Json(input): Json<AddWaterInput>) -> Result<Json<WaterEntr
     if !(10..=1_500).contains(&input.amount_ml) {
         return Err(bad_request("water must be between 10 and 1500 ml").into());
     }
-    let id = input
-        .id
-        .parse()
-        .map_err(|_| bad_request("water entry ID must be a UUID"))?;
     let date = date(&input.date)?;
     let timezone = timezone(&user)?;
     let entry = data(cx)
-        .add_water(id, user.id, input.amount_ml, date, timezone.name())
+        .add_water(user.id, input.amount_ml, date, timezone.name())
         .await?;
 
     Ok(Json(entry.into()))

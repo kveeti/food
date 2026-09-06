@@ -47,12 +47,12 @@ test("shows the previous water total while another day loads", async ({
 
   await finishSetup(page);
   const total = page.getByLabel("Water total");
-  await expect(total).toHaveText("--- ml");
-  await expect(total).toHaveCSS("filter", "blur(2px)");
+  await expect(total).toHaveText("--");
+  await expect(total).toHaveAttribute("aria-busy", "true");
 
   releaseInitial();
   await expect(total).toHaveText("0 ml");
-  await expect(total).toHaveCSS("filter", "none");
+  await expect(total).toHaveAttribute("aria-busy", "false");
   await page.unroute(waterPattern);
 
   let releasePreviousDay!: () => void;
@@ -68,10 +68,10 @@ test("shows the previous water total while another day loads", async ({
     .getByRole("link", { name: "Previous day" })
     .dispatchEvent("mousedown", { button: 0 });
   await expect(total).toHaveText("0 ml");
-  await expect(total).toHaveCSS("filter", "blur(2px)");
+  await expect(total).toHaveAttribute("aria-busy", "true");
 
   releasePreviousDay();
-  await expect(total).toHaveCSS("filter", "none");
+  await expect(total).toHaveAttribute("aria-busy", "false");
 });
 
 test("logs water with the glass and bottle controls", async ({ page }) => {

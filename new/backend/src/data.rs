@@ -249,7 +249,6 @@ impl Data {
     #[tracing::instrument(name = "data::add_water", level = "debug", skip_all)]
     pub async fn add_water(
         &self,
-        id: Uuid,
         user_id: Uuid,
         amount_ml: i32,
         date: NaiveDate,
@@ -265,7 +264,7 @@ impl Data {
              )
              RETURNING id, amount_ml, consumed_at",
         )
-        .bind(id)
+        .bind(Uuid::now_v7())
         .bind(user_id)
         .bind(amount_ml)
         .bind(date)

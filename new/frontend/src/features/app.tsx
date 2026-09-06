@@ -3,6 +3,7 @@ import { Redirect, Route, Switch, useLocation } from "wouter";
 import { useMeQuery } from "../api/user.ts";
 import { ImmediateNavLink } from "../ui/immediate-nav-link.tsx";
 import HomePage from "./home/home-page.tsx";
+import { I18n } from "./i18n/i18n.tsx";
 import SettingsPage from "./settings/settings-page.tsx";
 
 export default function App() {
@@ -31,7 +32,9 @@ export default function App() {
           <SettingsPage user={me.data} />
         </Route>
         <Route path="/">
-          <HomePage user={me.data} />
+          <I18n locale={me.data.locale!} timeZone={me.data.timezone!}>
+            <HomePage />
+          </I18n>
         </Route>
         <Route>
           <Redirect to="/" />

@@ -1,6 +1,7 @@
 import {
   keepPreviousData,
   useMutation,
+  useMutationState,
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
@@ -16,12 +17,36 @@ export type WaterEntry = {
 const waterEntriesQueryKey = (date: string) => ["water-entries", date] as const;
 
 export function useWaterEntriesQuery(date: string) {
-  return useQuery({
+  const query = useQuery({
     queryKey: waterEntriesQueryKey(date),
-    queryFn: () =>
-      api<WaterEntry[]>(`/api/water-entries?date=${encodeURIComponent(date)}`),
+    queryFn: ({ signal }) =>
+      api<WaterEntry[]>(`/api/water-entries?date=${encodeURIComponent(date)}`, {
+        signal,
+      }),
     placeholderData: keepPreviousData,
   });
+  const pendingEntries = useMutationState({
+    filters: { mutationKey: ["add-water", date], status: "pending" },
+    select: (mutation) => ({
+      id: null,
+      amount_ml: mutation.state.variables as number,
+      consumed_at: new Date(mutation.state.submittedAt).toISOString(),
+      submittedAt: mutation.state.submittedAt,
+    }),
+  });
+
+  const deletingIds = useMutationState({
+    filters: { mutationKey: ["delete-water", date], status: "pending" },
+    select: (mutation) => mutation.state.variables as string,
+  });
+
+  return {
+    ...query,
+    entries: [...pendingEntries, ...(query.data ?? [])].map((entry) => ({
+      ...entry,
+      isDeleting: entry.id !== null && deletingIds.includes(entry.id),
+    })),
+  };
 }
 
 export function useAddWaterMutation(date: string) {
@@ -29,35 +54,22 @@ export function useAddWaterMutation(date: string) {
   const queryKey = waterEntriesQueryKey(date);
 
   return useMutation({
-    mutationFn: (entry: WaterEntry) =>
+    mutationKey: ["add-water", date],
+    mutationFn: (amount_ml: number) =>
       api<WaterEntry>("/api/water-entries", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          id: entry.id,
-          amount_ml: entry.amount_ml,
-          date,
-        }),
+        body: JSON.stringify({ amount_ml, date }),
       }),
-    onMutate: async (entry) => {
-      await queryClient.cancelQueries({ queryKey });
-      const previous = queryClient.getQueryData<WaterEntry[]>(queryKey);
-      queryClient.setQueryData<WaterEntry[]>(queryKey, (entries) => [
-        entry,
-        ...(entries ?? []),
-      ]);
-      return { previous };
-    },
-    onError: (_error, _entry, context) => {
-      queryClient.setQueryData(queryKey, context?.previous);
-      void queryClient.invalidateQueries({ queryKey });
-    },
+    onMutate: () => queryClient.cancelQueries({ queryKey }),
     onSuccess: (savedEntry) => {
-      queryClient.setQueryData<WaterEntry[]>(queryKey, (entries) =>
-        (entries ?? []).map((entry) =>
-          entry.id === savedEntry.id ? savedEntry : entry,
-        ),
-      );
+      queryClient.setQueryData<WaterEntry[]>(queryKey, (entries) => [
+        savedEntry,
+        ...(entries ?? []).filter((entry) => entry.id !== savedEntry.id),
+      ]);
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey });
     },
   });
 }
@@ -67,20 +79,18 @@ export function useDeleteWaterMutation(date: string) {
   const queryKey = waterEntriesQueryKey(date);
 
   return useMutation({
+    mutationKey: ["delete-water", date],
     mutationFn: (entryId: string) =>
       api<void>(`/api/water-entries/${encodeURIComponent(entryId)}`, {
         method: "DELETE",
       }),
-    onMutate: async (entryId) => {
-      await queryClient.cancelQueries({ queryKey });
-      const previous = queryClient.getQueryData<WaterEntry[]>(queryKey);
+    onMutate: () => queryClient.cancelQueries({ queryKey }),
+    onSuccess: (_data, entryId) => {
       queryClient.setQueryData<WaterEntry[]>(queryKey, (entries) =>
         entries?.filter((entry) => entry.id !== entryId),
       );
-      return { previous };
     },
-    onError: (_error, _entryId, context) => {
-      queryClient.setQueryData(queryKey, context?.previous);
+    onSettled: () => {
       void queryClient.invalidateQueries({ queryKey });
     },
   });
