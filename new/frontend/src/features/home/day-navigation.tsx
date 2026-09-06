@@ -20,25 +20,29 @@ export function DayNavigation(props: { date: string; today: string }) {
   const eyebrow = props.date === props.today ? "Today" : f.weekday(props.date);
 
   return (
-    <header className="grid grid-cols-[2.5rem_1fr_2.5rem] items-center gap-2">
-      <DayLink
-        href={dayUrl(moveDate(props.date, -1), props.today)}
-        label="Previous day"
-      >
-        <ChevronRightIcon className="rotate-180" />
-      </DayLink>
-      <div className="text-center">
-        <p className="text-sm text-gray-600">{eyebrow}</p>
-        <h1 className="text-xl font-semibold tracking-tight text-gray-950">
-          <time dateTime={props.date}>{title}</time>
-        </h1>
+    <header className="fixed inset-x-0 bottom-[var(--nav-height)] z-10 border-t border-gray-200 bg-canvas/90 backdrop-blur-md sm:static sm:border-0 sm:bg-transparent sm:backdrop-blur-none">
+      <div className="mx-auto flex h-20 max-w-[var(--page-width)] items-center justify-between gap-3 px-4 sm:h-auto sm:px-0">
+        <div className="min-w-0">
+          <p className="text-sm text-gray-600">{eyebrow}</p>
+          <h1 className="text-xl font-semibold tracking-tight text-gray-950">
+            <time dateTime={props.date}>{title}</time>
+          </h1>
+        </div>
+        <div className="flex shrink-0 gap-2">
+          <DayLink
+            href={dayUrl(moveDate(props.date, -1), props.today)}
+            label="Previous day"
+          >
+            <ChevronRightIcon className="rotate-180" />
+          </DayLink>
+          <DayLink
+            href={dayUrl(moveDate(props.date, 1), props.today)}
+            label="Next day"
+          >
+            <ChevronRightIcon />
+          </DayLink>
+        </div>
       </div>
-      <DayLink
-        href={dayUrl(moveDate(props.date, 1), props.today)}
-        label="Next day"
-      >
-        <ChevronRightIcon />
-      </DayLink>
     </header>
   );
 }

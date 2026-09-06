@@ -25,7 +25,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-dvh">
+    <div>
       <AppNav setup={needsSetup} />
       <Switch>
         <Route path="/settings">
@@ -46,7 +46,7 @@ export default function App() {
 
 function AppNav(props: { setup: boolean }) {
   return (
-    <nav className="h-9 bg-gray-100/80 text-gray-950 backdrop-blur-md">
+    <nav className="fixed inset-x-0 bottom-0 z-10 h-[var(--nav-height)] border-t border-gray-200 bg-gray-100/80 pb-[env(safe-area-inset-bottom)] text-gray-950 backdrop-blur-md sm:sticky sm:top-0 sm:border-t-0 sm:pb-0">
       <div className="mx-auto flex h-full max-w-[var(--page-width)] items-stretch px-2 sm:px-4">
         {!props.setup && (
           <>
