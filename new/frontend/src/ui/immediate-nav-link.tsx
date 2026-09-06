@@ -31,13 +31,8 @@ export function ImmediateNavLink(props: {
       onClick={(event) => {
         if (event.button === 0 && isPlain(event)) event.preventDefault();
       }}
-      onMouseDown={(event) => {
-        if (event.button !== 0 || !isPlain(event)) return;
-        event.preventDefault();
-        navigate(props.href);
-      }}
-      onTouchStart={(event) => {
-        if (!isPlain(event)) return;
+      onPointerDown={(event) => {
+        if (!event.isPrimary || event.button !== 0 || !isPlain(event)) return;
         event.preventDefault();
         navigate(props.href);
       }}
