@@ -1,0 +1,10 @@
+{
+  "name": "Food",
+  "short_name": "Food",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#fafbfd",
+  "theme_color": "#fafbfd",
+  "icons": []
+}

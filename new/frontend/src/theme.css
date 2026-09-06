@@ -1,0 +1,227 @@
+:root {
+  --nav-height: 2.25rem;
+  --filterbar-height: 3.25rem;
+  --page-width: 35rem;
+
+  --scrollbar-pl: calc(100vw - 100%);
+
+  --surface-canvas: oklch(98.8% 0.003 250deg);
+  --surface-popover: var(--color-gray-25);
+  --surface-popover-alt: var(--color-gray-50);
+  --surface-form: var(--color-gray-100);
+  --popover-border: color-mix(in oklab, var(--color-gray-500) 15%, transparent);
+  --popover-item-selected: var(--color-gray-150);
+  --border-subtle: var(--color-gray-160);
+
+  --input-bg: var(--color-gray-215);
+  --input-bg-alt: var(--color-gray-280);
+  --input-bg-popover: var(--color-gray-170);
+  --input-bg-alt-popover: var(--color-gray-240);
+  --input-placeholder: var(--color-gray-600);
+  --input-ring-hover: var(--color-gray-325);
+  --input-ring-active: var(--color-gray-400);
+
+  --red-fg: var(--color-red-625);
+  --green-fg: var(--color-green-900);
+
+  --input-invalid-text: var(--danger-fg-strong);
+  --input-invalid-ring: var(--color-red-450);
+
+  --danger-surface: var(--color-red-200);
+  --danger-surface-hover: var(--color-red-300);
+  --danger-border: var(--color-red-300);
+  --danger-outline: var(--color-red-500);
+  --danger-focus: var(--color-red-500);
+  --danger-fg: var(--color-red-750);
+  --danger-fg-strong: var(--color-red-875);
+
+  --success-surface: var(--color-green-100);
+  --success-solid: var(--color-green-650);
+  --success-solid-hover: var(--color-green-550);
+  --success-fg: var(--color-green-700);
+  --success-visual: var(--color-green-350);
+
+  --demo-surface: oklch(94% 0.035 250deg);
+  --demo-surface-hover: oklch(91% 0.05 250deg);
+  --demo-border: oklch(76% 0.08 250deg);
+  --demo-solid: oklch(55% 0.13 250deg);
+  --demo-solid-hover: oklch(59% 0.14 250deg);
+  --demo-fg: oklch(43% 0.12 250deg);
+  --demo-focus: oklch(55% 0.13 250deg);
+
+  --stats-bar-visual: var(--color-gray-250);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --red-fg: var(--color-red-625);
+    --green-fg: var(--color-green-570);
+
+    --surface-canvas: var(--color-gray-65);
+    --surface-form: var(--color-gray-100);
+
+    --border-subtle: var(--color-gray-150);
+
+    --surface-popover: var(--color-gray-175);
+    --surface-popover-alt: var(--color-gray-90);
+    --popover-border: var(--color-gray-225);
+    --popover-item-selected: var(--color-gray-225);
+
+    --input-bg: var(--color-gray-195);
+    --input-bg-alt: var(--color-gray-230);
+    --input-bg-popover: var(--color-gray-245);
+    --input-bg-alt-popover: var(--color-gray-275);
+    --input-placeholder: var(--color-gray-600);
+    --input-ring-hover: var(--color-gray-275);
+    --input-ring-active: var(--color-gray-400);
+
+    --input-invalid-text: oklch(72% 0.2 25deg);
+    --input-invalid-ring: var(--color-red-350);
+
+    --danger-surface: oklch(24% 0.045 25deg);
+    --danger-surface-hover: oklch(29% 0.065 25deg);
+    --danger-border: oklch(32% 0.08 25deg);
+    --danger-outline: oklch(40% 0.12 25deg);
+    --danger-focus: oklch(62% 0.19 25deg);
+    --danger-fg: oklch(74% 0.15 24deg);
+    --danger-fg-strong: oklch(86% 0.08 22deg);
+
+    --success-surface: oklch(23% 0.035 150deg);
+    --success-solid: oklch(52% 0.14 150deg);
+    --success-solid-hover: oklch(55% 0.145 150deg);
+    --success-fg: oklch(75% 0.14 150deg);
+    --success-visual: oklch(58% 0.14 150deg);
+
+    --demo-surface: oklch(24% 0.035 250deg);
+    --demo-surface-hover: oklch(29% 0.05 250deg);
+    --demo-border: oklch(42% 0.075 250deg);
+    --demo-solid: oklch(58% 0.13 250deg);
+    --demo-solid-hover: oklch(62% 0.14 250deg);
+    --demo-fg: oklch(78% 0.09 250deg);
+    --demo-focus: oklch(66% 0.12 250deg);
+  }
+}
+
+@media (display-mode: standalone) {
+  :root {
+    --nav-height: 3.5rem;
+  }
+}
+
+@theme {
+  --color-*: initial;
+  --spacing: 0.25rem;
+  --default-border-width: 0.5px;
+  --shadow-float:
+    0 6px 18px oklch(12% 0.012 65deg / 2%),
+    0 3px 9px oklch(10% 0.01 60deg / 4%), 0 1px 1px oklch(8% 0.008 55deg / 4%);
+  --font-*: initial;
+
+  --animate-money-overlay-in: money-overlay-in 180ms
+    cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  --animate-money-overlay-out: money-overlay-out 140ms
+    cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  --animate-money-dialog-in: money-dialog-in 220ms cubic-bezier(0.16, 1, 0.3, 1)
+    forwards;
+  --animate-money-dialog-out: money-dialog-out 160ms
+    cubic-bezier(0.4, 0, 0.2, 1) forwards;
+
+  --font-normal: geist, "Geist";
+
+  --text-*: initial;
+  --text-xs: 0.6875rem;
+  --text-2xs: 0.8rem;
+  --text-sm: 0.8125rem;
+  --text-base: 0.875rem;
+  --text-md: 1rem;
+  --text-lg: 1.125rem;
+  --text-title: 1.2rem;
+  --text-xl: 1.375rem;
+
+  --color-white: #fff;
+  --color-black: #000;
+
+  --color-canvas: var(--surface-canvas);
+  --color-popover: var(--surface-popover);
+  --color-form: var(--surface-form);
+  --color-popover-border: var(--popover-border);
+  --color-popover-item-selected: var(--popover-item-selected);
+  --color-border-subtle: var(--border-subtle);
+
+  --color-danger-surface: var(--danger-surface);
+  --color-danger-surface-hover: var(--danger-surface-hover);
+  --color-danger-border: var(--danger-border);
+  --color-danger-outline: var(--danger-outline);
+  --color-danger-focus: var(--danger-focus);
+  --color-danger-fg: var(--danger-fg);
+  --color-danger-fg-strong: var(--danger-fg-strong);
+
+  --color-success-surface: var(--success-surface);
+  --color-success-solid: var(--success-solid);
+  --color-success-solid-hover: var(--success-solid-hover);
+  --color-success-fg: var(--success-fg);
+  --color-success-visual: var(--success-visual);
+
+  --color-demo-surface: var(--demo-surface);
+  --color-demo-surface-hover: var(--demo-surface-hover);
+  --color-demo-border: var(--demo-border);
+  --color-demo-solid: var(--demo-solid);
+  --color-demo-solid-hover: var(--demo-solid-hover);
+  --color-demo-fg: var(--demo-fg);
+  --color-demo-focus: var(--demo-focus);
+
+  --color-gray-0: var(--gray-0);
+  --color-gray-25: var(--gray-25);
+  --color-gray-50: var(--gray-50);
+  --color-gray-65: var(--gray-65);
+  --color-gray-90: var(--gray-90);
+  --color-gray-100: var(--gray-100);
+  --color-gray-125: var(--gray-125);
+  --color-gray-150: var(--gray-150);
+  --color-gray-160: var(--gray-160);
+  --color-gray-170: var(--gray-170);
+  --color-gray-175: var(--gray-175);
+  --color-gray-195: var(--gray-195);
+  --color-gray-200: var(--gray-200);
+  --color-gray-215: var(--gray-215);
+  --color-gray-225: var(--gray-225);
+  --color-gray-230: var(--gray-230);
+  --color-gray-240: var(--gray-240);
+  --color-gray-245: var(--gray-245);
+  --color-gray-250: var(--gray-250);
+  --color-gray-275: var(--gray-275);
+  --color-gray-280: var(--gray-280);
+  --color-gray-310: var(--gray-310);
+  --color-gray-325: var(--gray-325);
+  --color-gray-350: var(--gray-350);
+  --color-gray-400: var(--gray-400);
+  --color-gray-500: var(--gray-500);
+  --color-gray-600: var(--gray-600);
+  --color-gray-700: var(--gray-700);
+  --color-gray-800: var(--gray-800);
+  --color-gray-900: var(--gray-900);
+  --color-gray-950: var(--gray-950);
+  --color-gray-1000: var(--gray-1000);
+
+  --color-green-100: var(--green-100);
+  --color-green-220: var(--green-220);
+  --color-green-300: var(--green-300);
+  --color-green-350: var(--green-350);
+  --color-green-550: var(--green-550);
+  --color-green-570: var(--green-570);
+  --color-green-650: var(--green-650);
+  --color-green-700: var(--green-700);
+  --color-green-900: var(--green-900);
+  --color-green-950: var(--green-950);
+
+  --color-red-200: var(--red-200);
+  --color-red-280: var(--red-280);
+  --color-red-300: var(--red-300);
+  --color-red-350: var(--red-350);
+  --color-red-450: var(--red-450);
+  --color-red-500: var(--red-500);
+  --color-red-625: var(--red-625);
+  --color-red-750: var(--red-750);
+  --color-red-875: var(--red-875);
+  --color-red-950: var(--red-950);
+}
