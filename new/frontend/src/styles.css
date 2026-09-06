@@ -99,11 +99,6 @@ html.translated-rtl {
   stroke: none;
 }
 
-.water-liquid,
-.water-bubble-clip {
-  transition: transform 160ms ease-out;
-}
-
 .water-wave {
   transform-box: fill-box;
   transform-origin: center;
@@ -214,9 +209,7 @@ html.translated-rtl {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .water-vessel,
-  .water-liquid,
-  .water-bubble-clip {
+  .water-vessel {
     transition: none;
   }
 

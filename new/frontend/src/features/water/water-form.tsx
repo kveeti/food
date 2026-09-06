@@ -1,4 +1,11 @@
-import { type KeyboardEvent, type PointerEvent, useReducer } from "react";
+import { useReducedMotion } from "framer-motion";
+import {
+  type KeyboardEvent,
+  type PointerEvent,
+  useLayoutEffect,
+  useReducer,
+  useRef,
+} from "react";
 
 import { useAddWaterMutation } from "../../api/water.ts";
 import { Button } from "../../ui/button/button.tsx";
@@ -217,7 +224,49 @@ function VesselGraphic(props: { name: VesselName; liquidY: number }) {
   const vessel = VESSELS[props.name];
   const waterClip = `${props.name}-water-clip`;
   const bubbleClip = `${props.name}-bubble-clip`;
-  const transform = `translateY(${props.liquidY}px)`;
+  const liquidRef = useRef<SVGGElement>(null);
+  const bubbleClipRef = useRef<SVGRectElement>(null);
+  const currentY = useRef(props.liquidY);
+  const reducedMotion = useReducedMotion();
+
+  useLayoutEffect(() => {
+    let frame: number | undefined;
+    let previousTime: number | undefined;
+    const targetY = props.liquidY;
+
+    function renderLiquid() {
+      const transform = `translateY(${currentY.current}px)`;
+      if (liquidRef.current) liquidRef.current.style.transform = transform;
+      if (bubbleClipRef.current)
+        bubbleClipRef.current.style.transform = transform;
+    }
+
+    function animate(time: number) {
+      const elapsed = Math.min(time - (previousTime ?? time - 16), 32);
+      const distance = targetY - currentY.current;
+      if (Math.abs(distance) < 0.05) {
+        currentY.current = targetY;
+        renderLiquid();
+        return;
+      }
+      currentY.current += distance * (1 - Math.exp(-elapsed / 64));
+      renderLiquid();
+      previousTime = time;
+      frame = requestAnimationFrame(animate);
+    }
+
+    renderLiquid();
+    if (reducedMotion) {
+      currentY.current = targetY;
+      renderLiquid();
+    } else if (currentY.current !== targetY) {
+      frame = requestAnimationFrame(animate);
+    }
+
+    return () => {
+      if (frame !== undefined) cancelAnimationFrame(frame);
+    };
+  }, [props.liquidY, reducedMotion]);
 
   return (
     <svg
@@ -232,18 +281,18 @@ function VesselGraphic(props: { name: VesselName; liquidY: number }) {
         </clipPath>
         <clipPath id={bubbleClip}>
           <rect
+            ref={bubbleClipRef}
             className="water-bubble-clip"
             x="0"
             y="8"
             width="140"
             height="292"
-            style={{ transform }}
           />
         </clipPath>
       </defs>
       <path className="water-vessel-outline" d={vessel.path} />
       <g clipPath={`url(#${waterClip})`}>
-        <g className="water-liquid" style={{ transform }}>
+        <g ref={liquidRef} className="water-liquid">
           <path
             className="water-wave water-wave-back"
             d="M-192 4 C-168 2 -120 2 -96 4 C-72 6 -24 6 0 4 C24 2 72 2 96 4 C120 6 168 6 192 4 C216 2 264 2 288 4 C312 6 360 6 384 4 V300 H-192 Z"
