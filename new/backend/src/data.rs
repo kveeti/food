@@ -4,6 +4,8 @@ use anyhow::Result;
 use chrono::{DateTime, NaiveDate, Utc};
 use sqlx::{PgPool, migrate::MigrateError, types::Uuid};
 
+pub mod food;
+
 #[derive(Clone)]
 pub struct Data {
     pool: PgPool,

@@ -96,12 +96,12 @@ impl From<DataWaterEntry> for WaterEntry {
     }
 }
 
-fn date(value: &str) -> Result<NaiveDate> {
+pub(super) fn date(value: &str) -> Result<NaiveDate> {
     NaiveDate::parse_from_str(value, "%Y-%m-%d")
         .map_err(|_| bad_request("date must use YYYY-MM-DD").into())
 }
 
-fn timezone(user: &auth::User) -> Result<Tz> {
+pub(super) fn timezone(user: &auth::User) -> Result<Tz> {
     let Some(timezone) = user.timezone.as_deref() else {
         return Err(bad_request("choose a locale and timezone first").into());
     };

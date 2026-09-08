@@ -60,7 +60,7 @@ export default function SettingsPage(props: { user: User }) {
             <Field label="Locale" error={field.errors?.[0]}>
               <Input
                 {...field.props}
-                error={field.errors?.[0]}
+                error={!!field.errors}
                 value={field.input ?? ""}
                 placeholder="en-FI"
                 autoComplete="language"
@@ -74,7 +74,7 @@ export default function SettingsPage(props: { user: User }) {
             <Field label="Timezone" error={field.errors?.[0]}>
               <Input
                 {...field.props}
-                error={field.errors?.[0]}
+                error={!!field.errors}
                 value={field.input ?? ""}
                 placeholder="Europe/Helsinki"
                 autoComplete="off"

@@ -1,11 +1,16 @@
+import { useRef } from "react";
 import { useSearch } from "wouter";
 
+import { FoodSection } from "../food/food-section.tsx";
+import { NewFoodSection } from "../food/new-food-section.tsx";
 import { useI18n } from "../i18n/use-i18n.tsx";
+import { SearchSection } from "../search/search-section.tsx";
 import { WaterSection } from "../water/water-section.tsx";
 import { DayNavigation } from "./day-navigation.tsx";
 
 export default function HomePage() {
   const search = useSearch();
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const { f } = useI18n();
   const today = f.dateKey(new Date());
   const requestedDate = new URLSearchParams(search).get("date");
@@ -14,6 +19,12 @@ export default function HomePage() {
   return (
     <main className="mx-auto max-w-[var(--page-width)] px-4 py-8 sm:px-7">
       <DayNavigation date={date} today={today} />
+      <SearchSection inputRef={searchInputRef} />
+      <NewFoodSection
+        date={date}
+        onClose={() => searchInputRef.current?.focus()}
+      />
+      <FoodSection date={date} />
       <WaterSection date={date} />
     </main>
   );

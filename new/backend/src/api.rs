@@ -1,3 +1,4 @@
+mod food;
 mod settings;
 mod water;
 
@@ -26,7 +27,7 @@ struct Me {
 pub fn register(builder: RouterBuilder) -> RouterBuilder {
     let builder = builder.route(health).route(me);
     let builder = settings::register(builder);
-    water::register(builder)
+    food::register(water::register(builder))
 }
 
 #[route(GET "/health")]

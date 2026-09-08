@@ -6,7 +6,14 @@ const root = fileURLToPath(new URL("../../", import.meta.url));
 export default function globalSetup() {
   execFileSync(
     "cargo",
-    ["build", "--manifest-path", "backend/Cargo.toml", "--bins"],
+    [
+      "build",
+      "--manifest-path",
+      "backend/Cargo.toml",
+      "--bins",
+      "--features",
+      "test-support",
+    ],
     { cwd: root, stdio: "inherit" },
   );
 }

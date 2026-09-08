@@ -127,6 +127,14 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
 
       try {
         await waitForHttp(`${stack.backendUrl}/health`, backend);
+        execFileSync(
+          join(root, "backend", "target", "debug", "seed-test-catalog"),
+          [],
+          {
+            env: { ...process.env, DATABASE_URL: databaseUrl },
+            stdio: "inherit",
+          },
+        );
         await provide();
       } finally {
         await stopProcess(backend);

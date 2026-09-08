@@ -3,6 +3,14 @@ name = "food-backend"
 version = "0.1.0"
 edition = "2024"
 
+[features]
+test-support = []
+
+[[bin]]
+name = "seed-test-catalog"
+path = "test-support/seed_catalog.rs"
+required-features = ["test-support"]
+
 [dependencies]
 aes-gcm = "0.10"
 anyhow = "1"
