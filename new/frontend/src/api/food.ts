@@ -265,8 +265,10 @@ export function useAddFoodMutation(date: string) {
     },
     onSettled: () => {
       void client.invalidateQueries({ queryKey: ["meal-suggestion", date] });
-      if (client.isMutating({ mutationKey: ["food-entry", date] }) === 1)
+      if (client.isMutating({ mutationKey: ["food-entry", date] }) === 1) {
         void client.invalidateQueries({ queryKey });
+        void client.invalidateQueries({ queryKey: ["goals", date] });
+      }
     },
   });
 }
@@ -286,8 +288,10 @@ export function useDeleteFoodMutation(date: string) {
     },
     onSettled: () => {
       void client.invalidateQueries({ queryKey: ["meal-suggestion", date] });
-      if (client.isMutating({ mutationKey: ["food-entry", date] }) === 1)
+      if (client.isMutating({ mutationKey: ["food-entry", date] }) === 1) {
         void client.invalidateQueries({ queryKey });
+        void client.invalidateQueries({ queryKey: ["goals", date] });
+      }
     },
   });
 }
@@ -327,8 +331,10 @@ export function useUpdateFoodMutation(date: string) {
       );
     },
     onSettled: () => {
-      if (client.isMutating({ mutationKey: ["food-entry", date] }) === 1)
+      if (client.isMutating({ mutationKey: ["food-entry", date] }) === 1) {
         void client.invalidateQueries({ queryKey });
+        void client.invalidateQueries({ queryKey: ["goals", date] });
+      }
     },
   });
 }

@@ -186,10 +186,10 @@ test("searches, loads a skeleton, and logs and deletes food with keyboard", asyn
   await expect(search).not.toBeFocused();
   const entries = foodSection.getByRole("list", { name: "Breakfast foods" });
   await expect(entries).toContainText("150.5 g");
-  await expect(entries).toContainText("75.25 kcal");
+  await expect(entries).toContainText("75 kcal");
   await page.reload();
   await expect(entries).toContainText("Apple");
-  await expect(entries).toContainText("75.25 kcal");
+  await expect(entries).toContainText("75 kcal");
   const deleted = page.waitForResponse(
     (response) => response.request().method() === "DELETE",
   );
@@ -300,7 +300,7 @@ test("continues meals and edits, cancels, retries and deletes inline", async ({
   const appleRow = edit.locator("..");
   await edit.click();
   await foods.getByLabel("Amount (g)").fill("150,5");
-  await expect(foods.getByText("75.25 kcal", { exact: true })).toBeVisible();
+  await expect(foods.getByText("75 kcal", { exact: true })).toBeVisible();
   await foods.getByRole("button", { name: "Cancel", exact: true }).click();
   await expect(appleRow).toContainText("100 g");
   await edit.click();

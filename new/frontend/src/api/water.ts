@@ -1,5 +1,6 @@
 import {
   keepPreviousData,
+  type QueryClient,
   useMutation,
   useMutationState,
   useQuery,
@@ -7,12 +8,29 @@ import {
 } from "@tanstack/react-query";
 
 import { api } from "./api.ts";
+import { goalsProgressKey, type GoalsWithProgress } from "./goals.ts";
 
 export type WaterEntry = {
   id: string;
   amount_ml: number;
   consumed_at: string;
 };
+
+type DeleteWaterInput = Pick<WaterEntry, "id" | "amount_ml">;
+
+function changeWaterTotal(client: QueryClient, date: string, change: number) {
+  client.setQueryData<GoalsWithProgress>(goalsProgressKey(date), (goals) =>
+    goals
+      ? {
+          ...goals,
+          progress: {
+            ...goals.progress,
+            water_ml: goals.progress.water_ml + change,
+          },
+        }
+      : goals,
+  );
+}
 
 const waterEntriesQueryKey = (date: string) => ["water-entries", date] as const;
 
@@ -26,7 +44,7 @@ export function useWaterEntriesQuery(date: string) {
     placeholderData: keepPreviousData,
   });
   const pendingEntries = useMutationState({
-    filters: { mutationKey: ["add-water", date], status: "pending" },
+    filters: { mutationKey: ["water-entry", date, "add"], status: "pending" },
     select: (mutation) => ({
       id: null,
       amount_ml: mutation.state.variables as number,
@@ -36,8 +54,11 @@ export function useWaterEntriesQuery(date: string) {
   });
 
   const deletingIds = useMutationState({
-    filters: { mutationKey: ["delete-water", date], status: "pending" },
-    select: (mutation) => mutation.state.variables as string,
+    filters: {
+      mutationKey: ["water-entry", date, "delete"],
+      status: "pending",
+    },
+    select: (mutation) => (mutation.state.variables as DeleteWaterInput).id,
   });
 
   return {
@@ -52,16 +73,26 @@ export function useWaterEntriesQuery(date: string) {
 export function useAddWaterMutation(date: string) {
   const queryClient = useQueryClient();
   const queryKey = waterEntriesQueryKey(date);
+  const progressKey = goalsProgressKey(date);
 
   return useMutation({
-    mutationKey: ["add-water", date],
+    mutationKey: ["water-entry", date, "add"],
     mutationFn: (amount_ml: number) =>
       api<WaterEntry>("/api/water-entries", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ amount_ml, date }),
       }),
-    onMutate: () => queryClient.cancelQueries({ queryKey }),
+    onMutate: async (amount) => {
+      await Promise.all([
+        queryClient.cancelQueries({ queryKey }),
+        queryClient.cancelQueries({ queryKey: progressKey }),
+      ]);
+      changeWaterTotal(queryClient, date, amount);
+    },
+    onError: (_error, amount) => {
+      changeWaterTotal(queryClient, date, -amount);
+    },
     onSuccess: (savedEntry) => {
       queryClient.setQueryData<WaterEntry[]>(queryKey, (entries) => [
         savedEntry,
@@ -69,7 +100,12 @@ export function useAddWaterMutation(date: string) {
       ]);
     },
     onSettled: () => {
-      void queryClient.invalidateQueries({ queryKey });
+      if (
+        queryClient.isMutating({ mutationKey: ["water-entry", date] }) === 1
+      ) {
+        void queryClient.invalidateQueries({ queryKey });
+        void queryClient.invalidateQueries({ queryKey: ["goals", date] });
+      }
     },
   });
 }
@@ -77,21 +113,38 @@ export function useAddWaterMutation(date: string) {
 export function useDeleteWaterMutation(date: string) {
   const queryClient = useQueryClient();
   const queryKey = waterEntriesQueryKey(date);
+  const progressKey = goalsProgressKey(date);
 
   return useMutation({
-    mutationKey: ["delete-water", date],
-    mutationFn: (entryId: string) =>
-      api<void>(`/api/water-entries/${encodeURIComponent(entryId)}`, {
+    mutationKey: ["water-entry", date, "delete"],
+    mutationFn: async (entry: DeleteWaterInput) => {
+      await api<void>(`/api/water-entries/${encodeURIComponent(entry.id)}`, {
         method: "DELETE",
-      }),
-    onMutate: () => queryClient.cancelQueries({ queryKey }),
-    onSuccess: (_data, entryId) => {
+      });
+      return entry;
+    },
+    onMutate: async (entry) => {
+      await Promise.all([
+        queryClient.cancelQueries({ queryKey }),
+        queryClient.cancelQueries({ queryKey: progressKey }),
+      ]);
+      changeWaterTotal(queryClient, date, -entry.amount_ml);
+    },
+    onError: (_error, entry) => {
+      changeWaterTotal(queryClient, date, entry.amount_ml);
+    },
+    onSuccess: (entry) => {
       queryClient.setQueryData<WaterEntry[]>(queryKey, (entries) =>
-        entries?.filter((entry) => entry.id !== entryId),
+        entries?.filter((item) => item.id !== entry.id),
       );
     },
     onSettled: () => {
-      void queryClient.invalidateQueries({ queryKey });
+      if (
+        queryClient.isMutating({ mutationKey: ["water-entry", date] }) === 1
+      ) {
+        void queryClient.invalidateQueries({ queryKey });
+        void queryClient.invalidateQueries({ queryKey: ["goals", date] });
+      }
     },
   });
 }

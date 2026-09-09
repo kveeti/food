@@ -96,7 +96,7 @@ function FoodMeal(props: {
             </time>
             {" · "}
             {energy.length
-              ? `${f.amount(energy.reduce((total, nutrient) => total + nutrient.value, 0))} kcal`
+              ? `${f.calories(energy.reduce((total, nutrient) => total + nutrient.value, 0))} kcal`
               : "Energy unknown"}
           </p>
         </header>

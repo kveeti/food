@@ -102,7 +102,7 @@ export function FoodEntryRow(props: { entry: FoodEntryView; date: string }) {
                       {f.amount(props.entry.amount)} {props.entry.unit}
                     </span>
                     <span className="block text-sm text-gray-600">
-                      {energy ? `${f.amount(energy.value)} kcal` : "-- kcal"}
+                      {energy ? `${f.calories(energy.value)} kcal` : "-- kcal"}
                     </span>
                   </motion.span>
                 )}
@@ -328,7 +328,7 @@ function LiveKcal(props: { amount: string; entry: FoodEntry }) {
   if (!energy || !Number.isFinite(number) || number <= 0) {
     value = "--";
   } else {
-    value = f.amount((energy.value * number) / props.entry.amount);
+    value = f.calories((energy.value * number) / props.entry.amount);
   }
 
   return (

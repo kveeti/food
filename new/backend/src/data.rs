@@ -5,6 +5,7 @@ use chrono::{DateTime, NaiveDate, Utc};
 use sqlx::{PgPool, migrate::MigrateError, types::Uuid};
 
 pub mod food;
+pub mod goals;
 
 #[derive(Clone)]
 pub struct Data {
@@ -245,6 +246,22 @@ impl Data {
         .bind(date)
         .bind(timezone)
         .fetch_all(&self.pool)
+        .await?)
+    }
+
+    #[tracing::instrument(name = "data::water_total", level = "debug", skip_all)]
+    pub async fn water_total(&self, user_id: Uuid, date: NaiveDate, timezone: &str) -> Result<i64> {
+        Ok(sqlx::query_scalar(
+            "SELECT coalesce(sum(amount_ml), 0)::bigint
+             FROM water_entries
+             WHERE user_id = $1
+               AND consumed_at >= ($2::date::timestamp AT TIME ZONE $3)
+               AND consumed_at < (($2::date + 1)::timestamp AT TIME ZONE $3)",
+        )
+        .bind(user_id)
+        .bind(date)
+        .bind(timezone)
+        .fetch_one(&self.pool)
         .await?)
     }
 

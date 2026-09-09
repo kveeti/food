@@ -90,6 +90,63 @@ html.translated-rtl {
   }
 }
 
+.goal-card {
+  --goal-transition: 360ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.goal-card[data-has-goal="true"] {
+  background: var(--goal-soft);
+}
+
+.goal-card[data-tone="calorie"] {
+  --goal-soft: var(--goal-calorie-soft);
+  --goal-solid: var(--goal-calorie-solid);
+}
+
+.goal-card[data-tone="water"] {
+  --goal-soft: var(--goal-water-soft);
+  --goal-solid: var(--goal-water-solid);
+}
+
+.goal-card-fill {
+  width: 100%;
+  background: var(--goal-solid);
+  transform: scaleX(var(--fill-scale));
+  transform-origin: left;
+  transition: transform var(--goal-transition);
+}
+
+.goal-card-range {
+  left: var(--range-start);
+  width: var(--range-size);
+  border-left: 0 solid var(--goal-soft);
+  transition:
+    left var(--goal-transition),
+    width var(--goal-transition);
+}
+
+.goal-card-range[data-over-goal="true"] {
+  border-left-width: 2px;
+}
+
+.goal-card-range::after {
+  position: absolute;
+  inset: 0;
+  content: "";
+  background-color: var(--goal-solid);
+  background-image: repeating-linear-gradient(
+    135deg,
+    transparent 0 0.35rem,
+    rgb(0 0 0 / 24%) 0.35rem 0.7rem
+  );
+  opacity: 0;
+  transition: opacity var(--goal-transition);
+}
+
+.goal-card-range[data-over-goal="true"]::after {
+  opacity: 1;
+}
+
 .water-vessel {
   position: absolute;
   top: 0;
@@ -238,6 +295,12 @@ html.translated-rtl {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .goal-card-fill,
+  .goal-card-range,
+  .goal-card-range::after {
+    transition: none;
+  }
+
   .water-vessel {
     transition: none;
   }

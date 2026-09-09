@@ -283,9 +283,7 @@ export function Nutrition(props: {
             </dt>
             <dd className="tabular-nums text-gray-950">
               {nutrient
-                ? `${f.nutrient(
-                    (nutrient.value * (props.amount ?? 100)) / 100,
-                  )} ${nutrient.unit}`
+                ? `${code === "energy" ? f.calories((nutrient.value * (props.amount ?? 100)) / 100) : f.nutrient((nutrient.value * (props.amount ?? 100)) / 100)} ${nutrient.unit}`
                 : "Unknown"}
             </dd>
           </div>

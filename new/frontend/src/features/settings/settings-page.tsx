@@ -6,6 +6,8 @@ import { useSaveSettingsMutation, type User } from "../../api/user.ts";
 import { Button } from "../../ui/button/button.tsx";
 import { Field } from "../../ui/input/field.tsx";
 import { Input } from "../../ui/input/input.tsx";
+import { I18n } from "../i18n/i18n.tsx";
+import { GoalSettings } from "./goal-settings.tsx";
 
 const schema = v.object({
   locale: v.pipe(v.string(), v.trim(), v.nonEmpty("Enter a locale")),
@@ -99,6 +101,11 @@ export default function SettingsPage(props: { user: User }) {
           </Button>
         </div>
       </Form>
+      {!needsSetup && (
+        <I18n locale={props.user.locale!} timeZone={props.user.timezone!}>
+          <GoalSettings />
+        </I18n>
+      )}
     </main>
   );
 }

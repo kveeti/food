@@ -118,7 +118,7 @@ test("rolls back both water views after failed adds and deletes", async ({
   await expect(entries.getByRole("listitem")).toHaveCount(0);
 });
 
-test("shows one list error and an unknown total when water reads fail", async ({
+test("keeps the server total when the water entry list fails", async ({
   page,
 }) => {
   await login(page);
@@ -145,15 +145,15 @@ test("shows one list error and an unknown total when water reads fail", async ({
     timeout: 15_000,
   });
   await expect(error).toHaveCount(1);
-  await expect(total).toHaveText("--");
-  // A failed refresh must not show a cached amount as a valid total.
+  await expect(total).toHaveText("250 ml");
+  // The summary and entry list load from separate sources.
   await expect(entries.getByText("250 ml")).toBeVisible();
 
   await page.reload();
   await expect(error).toHaveText("Could not load the water entries.", {
     timeout: 15_000,
   });
-  await expect(total).toHaveText("--");
+  await expect(total).toHaveText("250 ml");
   await expect(entries.getByRole("listitem")).toHaveCount(0);
 
   await page.unroute("**/api/water-entries?*");

@@ -45,7 +45,9 @@ export function WaterEntryRow(props: {
             disabled={props.loading || deletion.isPending || id === null}
             className="grid size-9 place-items-center rounded-lg text-danger-fg outline-2 outline-transparent outline-offset-2 hover:not-disabled:bg-danger-surface focus-visible:outline-danger-focus disabled:opacity-50"
             onClick={() => {
-              if (id !== null) deletion.mutate(id);
+              if (id !== null) {
+                deletion.mutate({ id, amount_ml: props.entry.amount_ml });
+              }
             }}
           >
             <TrashIcon />

@@ -35,12 +35,12 @@ test("shows the previous water total while another day loads", async ({
 }) => {
   await login(page);
 
-  const waterPattern = "**/api/water-entries?*";
+  const progressPattern = /\/api\/goals\?.*include=progress/;
   let releaseInitial!: () => void;
   const initialGate = new Promise<void>((resolve) => {
     releaseInitial = resolve;
   });
-  await page.route(waterPattern, async (route) => {
+  await page.route(progressPattern, async (route) => {
     await initialGate;
     await route.continue();
   });
@@ -53,13 +53,13 @@ test("shows the previous water total while another day loads", async ({
   releaseInitial();
   await expect(total).toHaveText("0 ml");
   await expect(total).toHaveAttribute("aria-busy", "false");
-  await page.unroute(waterPattern);
+  await page.unroute(progressPattern);
 
   let releasePreviousDay!: () => void;
   const previousDayGate = new Promise<void>((resolve) => {
     releasePreviousDay = resolve;
   });
-  await page.route(waterPattern, async (route) => {
+  await page.route(progressPattern, async (route) => {
     await previousDayGate;
     await route.continue();
   });

@@ -50,6 +50,15 @@
   --demo-focus: oklch(55% 0.13 250deg);
 
   --stats-bar-visual: var(--color-gray-250);
+
+  --goal-calorie-soft: oklch(93% 0.07 75deg);
+  --goal-calorie-solid: oklch(82% 0.14 68deg);
+  --goal-water-soft: color-mix(
+    in oklab,
+    oklch(81% 0.14 252deg) 35%,
+    transparent
+  );
+  --goal-water-solid: oklch(81% 0.14 252deg);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -99,6 +108,11 @@
     --demo-solid-hover: oklch(62% 0.14 250deg);
     --demo-fg: oklch(78% 0.09 250deg);
     --demo-focus: oklch(66% 0.12 250deg);
+
+    --goal-calorie-soft: oklch(28% 0.045 68deg);
+    --goal-calorie-solid: oklch(48% 0.1 68deg);
+    --goal-water-soft: oklch(27% 0.04 252deg);
+    --goal-water-solid: oklch(48% 0.11 252deg);
   }
 }
 
