@@ -6,8 +6,9 @@ export default defineConfig({
   cacheDir: process.env.VITE_CACHE_DIR ?? "node_modules/.vite",
   plugins: [react(), tailwindcss()],
   server: {
-    host: "127.0.0.1",
+    host: process.env.VITE_HOST ?? "127.0.0.1",
     port: Number(process.env.VITE_PORT ?? 3000),
+    strictPort: true,
     proxy: {
       "/api": {
         target: process.env.BACKEND_URL ?? "http://127.0.0.1:8000",
