@@ -3,7 +3,6 @@ import { useSearch } from "wouter";
 
 import { FoodSection } from "../food/food-section.tsx";
 import { NewFoodSection } from "../food/new-food-section.tsx";
-import { NutrientTotals } from "../food/nutrient-totals.tsx";
 import { useI18n } from "../i18n/use-i18n.tsx";
 import { SearchSection } from "../search/search-section.tsx";
 import { WaterSection } from "../water/water-section.tsx";
@@ -22,7 +21,6 @@ export default function HomePage() {
     <main className="mx-auto max-w-[var(--page-width)] px-4 py-8 sm:px-7">
       <DayNavigation date={date} today={today} />
       <DaySummary date={date} />
-      <NutrientTotals date={date} />
       <SearchSection inputRef={searchInputRef} />
       <NewFoodSection
         date={date}

@@ -19,6 +19,7 @@ export function NewFoodSection(props: { date: string; onClose: () => void }) {
       current.get("date") !== params.get("date")
     )
       return;
+    mutation.reset();
     current.delete("food");
     navigate(`/${current.size ? `?${current}` : ""}`, { replace: true });
     if (focusSearch) props.onClose();

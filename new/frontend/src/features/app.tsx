@@ -14,7 +14,7 @@ export default function App() {
   if (me.isError) {
     return (
       <main className="mx-auto max-w-[var(--page-width)] px-4 py-8 sm:px-7">
-        Could not load Food.
+        Error loading Food.
       </main>
     );
   }

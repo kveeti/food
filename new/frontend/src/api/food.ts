@@ -115,6 +115,7 @@ export function useFoodMealsQuery(date: string) {
     queryKey: mealsKey(date),
     queryFn: ({ signal }) =>
       api<FoodMeal[]>(`/api/meals?date=${date}`, { signal }),
+    placeholderData: keepPreviousData,
     structuralSharing: (oldData, newData) =>
       keepRenderKeys(
         oldData as CachedFoodMeal[] | undefined,
@@ -262,9 +263,9 @@ export function useAddFoodMutation(date: string) {
           ...meals,
         ];
       });
+      void client.invalidateQueries({ queryKey: ["meal-suggestion", date] });
     },
     onSettled: () => {
-      void client.invalidateQueries({ queryKey: ["meal-suggestion", date] });
       if (client.isMutating({ mutationKey: ["food-entry", date] }) === 1) {
         void client.invalidateQueries({ queryKey });
         void client.invalidateQueries({ queryKey: ["goals", date] });

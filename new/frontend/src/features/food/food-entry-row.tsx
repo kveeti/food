@@ -6,7 +6,7 @@ import {
   useForm,
 } from "@formisch/react";
 import { AnimatePresence, motion, useIsPresent } from "framer-motion";
-import { useEffect, useId, useRef, useState } from "react";
+import { useId, useRef, useState } from "react";
 import * as v from "valibot";
 
 import {
@@ -25,37 +25,37 @@ import { amountSchema } from "./amount-schema.ts";
 
 const editFoodSchema = v.object({ amount: amountSchema });
 export function FoodEntryRow(props: { entry: FoodEntryView; date: string }) {
-  const [editing, setEditing] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
   const headerButton = useRef<HTMLButtonElement>(null);
-  const reducedMotion = useIsReducedMotion();
+  const isReducedMotion = useIsReducedMotion();
   const present = useIsPresent();
   const deletion = useDeleteFoodMutation(props.date);
-  const deleting = deletion.isPending;
+  const isDeleting = deletion.isPending;
   const savedEntry = props.entry.id === null ? null : props.entry;
   const { f } = useI18n();
   const energy = props.entry.nutrients.find(
     (nutrient) => nutrient.code === "energy",
   );
   const toggle = () => {
-    if (editing) {
+    if (isEditing) {
       deletion.reset();
-      setEditing(false);
+      setIsEditing(false);
       requestAnimationFrame(() => headerButton.current?.focus());
     } else if (savedEntry) {
-      setEditing(true);
+      setIsEditing(true);
     }
   };
 
   return (
     <motion.li
-      aria-hidden={deleting || !present || undefined}
-      inert={deleting || !present}
-      layout={reducedMotion ? false : "position"}
+      aria-hidden={isDeleting || !present || undefined}
+      inert={isDeleting || !present}
+      layout={isReducedMotion ? false : "position"}
       initial={{ opacity: 0 }}
-      animate={{ height: deleting ? 0 : "auto", opacity: deleting ? 0 : 1 }}
+      animate={{ height: isDeleting ? 0 : "auto", opacity: isDeleting ? 0 : 1 }}
       exit={{ height: 0, opacity: 0 }}
       transition={{
-        duration: reducedMotion ? 0 : 0.25,
+        duration: isReducedMotion ? 0 : 0.25,
         ease: [0.16, 1, 0.3, 1],
       }}
     >
@@ -63,23 +63,23 @@ export function FoodEntryRow(props: { entry: FoodEntryView; date: string }) {
         <motion.div
           aria-hidden="true"
           className="my-2 pointer-events-none absolute inset-0 rounded-[1.25rem] bg-gray-250"
-          initial={{ opacity: reducedMotion ? 0 : 1 }}
+          initial={{ opacity: isReducedMotion ? 0 : 0.55 }}
           animate={{ opacity: 0 }}
           transition={{
-            delay: reducedMotion ? 0 : 0.45,
-            duration: reducedMotion ? 0 : 1.2,
+            delay: isReducedMotion ? 0 : 0.6,
+            duration: isReducedMotion ? 0 : 2.4,
             ease: "easeOut",
           }}
         />
 
         <div
-          className={`group relative rounded-[1.25rem] transition-colors duration-200 motion-reduce:transition-none ${editing ? "bg-gray-100" : "hover:bg-gray-100"}`}
+          className={`group relative rounded-[1.25rem] transition-colors duration-200 motion-reduce:transition-none ${isEditing ? "bg-gray-100" : "hover:bg-gray-100"}`}
         >
           <div className="grid grid-cols-[minmax(0,1fr)_7rem_auto] grid-rows-[minmax(4.5rem,auto)_auto] items-start gap-x-1.5">
             <button
               ref={headerButton}
               type="button"
-              aria-label={`${editing ? "Close" : "Edit"} ${props.entry.food_name} entry`}
+              aria-label={`${isEditing ? "Close" : "Edit"} ${props.entry.food_name} entry`}
               onClick={toggle}
               disabled={!savedEntry}
               className="col-span-3 col-start-1 row-start-1 grid self-stretch grid-cols-subgrid rounded-[1.25rem] text-left font-[inherit] outline-2 outline-transparent outline-offset-2 focus-visible:outline-gray-500"
@@ -89,13 +89,13 @@ export function FoodEntryRow(props: { entry: FoodEntryView; date: string }) {
               </span>
 
               <AnimatePresence initial={false} mode="sync">
-                {!editing && (
+                {!isEditing && (
                   <motion.span
                     key="amount-summary"
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
-                    transition={{ duration: reducedMotion ? 0 : 0.16 }}
+                    transition={{ duration: isReducedMotion ? 0 : 0.16 }}
                     className="col-start-2 row-start-1 py-3 text-right tabular-nums"
                   >
                     <span className="block font-medium text-gray-700">
@@ -111,19 +111,19 @@ export function FoodEntryRow(props: { entry: FoodEntryView; date: string }) {
               <span className="col-start-3 row-start-1 grid self-stretch place-items-center pr-1.5 text-gray-600">
                 <span className="grid size-6 place-items-center">
                   <ChevronRightIcon
-                    className={`transition-transform duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none ${editing ? "rotate-90" : ""}`}
+                    className={`transition-transform duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none ${isEditing ? "rotate-90" : ""}`}
                   />
                 </span>
               </span>
             </button>
 
             <AnimatePresence initial={false} mode="sync">
-              {editing && savedEntry && (
+              {isEditing && savedEntry && (
                 <FoodEntryEditor
                   key="editor"
                   entry={savedEntry}
                   date={props.date}
-                  reducedMotion={reducedMotion}
+                  reducedMotion={isReducedMotion}
                   deletion={deletion}
                   onClose={toggle}
                 />
@@ -170,13 +170,6 @@ function FoodEntryEditor(props: {
   const amount = useField(form, { path: ["amount"] });
   const update = useUpdateFoodMutation(props.date);
   const deletion = props.deletion;
-  const [showDeleteError, setShowDeleteError] = useState(false);
-
-  useEffect(() => {
-    if (!showDeleteError) return;
-    const timeout = window.setTimeout(() => setShowDeleteError(false), 1_500);
-    return () => window.clearTimeout(timeout);
-  }, [showDeleteError]);
 
   const onSubmit: SubmitHandler<typeof editFoodSchema> = async (values) => {
     if (update.isPending || deletion.isPending) return;
@@ -266,12 +259,7 @@ function FoodEntryEditor(props: {
           onSubmit={onSubmit}
           className="space-y-3 p-2"
         >
-          {update.isError && (
-            <p role="alert" className="text-danger-fg">
-              {update.error.message}
-            </p>
-          )}
-          <div className="flex items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <Button
                 type="button"
@@ -280,17 +268,14 @@ function FoodEntryEditor(props: {
                 className="px-3!"
                 onClick={() => {
                   if (update.isPending || deletion.isPending) return;
-                  setShowDeleteError(false);
-                  deletion.mutate(props.entry.id, {
-                    onError: () => setShowDeleteError(true),
-                  });
+                  deletion.mutate(props.entry.id);
                 }}
               >
                 <TrashIcon />
                 Delete
               </Button>
               <AnimatePresence initial={false}>
-                {showDeleteError && (
+                {deletion.isError && (
                   <motion.p
                     role="alert"
                     initial={{ opacity: 0 }}
@@ -304,7 +289,21 @@ function FoodEntryEditor(props: {
                 )}
               </AnimatePresence>
             </div>
-            <div className="flex gap-2">
+            <div className="ml-auto flex flex-wrap justify-end gap-2">
+              <AnimatePresence initial={false}>
+                {update.isError && (
+                  <motion.p
+                    role="alert"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: props.reducedMotion ? 0 : 0.16 }}
+                    className="rounded-lg bg-danger-surface text-sm text-danger-fg"
+                  >
+                    <span className="block px-2 py-1">Error updating food</span>
+                  </motion.p>
+                )}
+              </AnimatePresence>
               <Button type="button" variant="ghost" onClick={props.onClose}>
                 Cancel
               </Button>

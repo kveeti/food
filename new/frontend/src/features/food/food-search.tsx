@@ -2,6 +2,7 @@ import { Autocomplete } from "@base-ui/react/autocomplete";
 import type { Ref } from "react";
 
 import { useFoodSearchQuery, type Food } from "../../api/food.ts";
+import { Button } from "../../ui/button/button.tsx";
 import { Input } from "../../ui/input/input.tsx";
 
 export function FoodSearch({
@@ -62,12 +63,25 @@ export function FoodSearch({
         >
           <Autocomplete.Popup className="overflow-hidden rounded-xl border border-[var(--popover-border)] bg-[var(--surface-popover)] text-gray-950 shadow-lg">
             <Autocomplete.Status className="text-sm text-gray-600">
-              {loading ? (
+              {results.isError ? (
+                <div className="bg-danger-surface">
+                  <div className="flex items-center justify-between gap-3 p-3">
+                    <p role="alert" className="font-medium text-danger-fg">
+                      Error searching foods
+                    </p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={results.isFetching}
+                      onPointerDown={(event) => event.preventDefault()}
+                      onClick={() => void results.refetch()}
+                    >
+                      {results.isFetching ? "Retrying…" : "Try again"}
+                    </Button>
+                  </div>
+                </div>
+              ) : loading ? (
                 <span className="sr-only">Searching…</span>
-              ) : results.isError ? (
-                <p role="alert" className="p-3 text-danger-fg">
-                  Could not search foods. Try again.
-                </p>
               ) : null}
             </Autocomplete.Status>
             <Autocomplete.Empty className="text-sm text-gray-600">

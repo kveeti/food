@@ -23,7 +23,7 @@ test("requires and saves locale and timezone", async ({ page }) => {
 
   await page
     .getByRole("link", { name: "Settings" })
-    .dispatchEvent("mousedown", { button: 0 });
+    .dispatchEvent("pointerdown", { button: 0, isPrimary: true });
   await expect(page).toHaveURL(/\/settings$/);
   await expectSameDocument(page);
   await expect(page.getByLabel("Locale")).toHaveValue("en-FI");
@@ -46,13 +46,18 @@ test("shows the previous water total while another day loads", async ({
   });
 
   await finishSetup(page);
-  const total = page.getByLabel("Water total");
-  await expect(total).toHaveText("--");
-  await expect(total).toHaveAttribute("aria-busy", "true");
+  const dayTotals = page.getByRole("region", { name: "Day totals" });
+  await expect(
+    dayTotals.getByRole("status", { name: "Loading water total" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("status", { name: "Loading nutrient totals" }),
+  ).toBeVisible();
 
   releaseInitial();
+  const total = page.getByLabel("Water total");
   await expect(total).toHaveText("0 ml");
-  await expect(total).toHaveAttribute("aria-busy", "false");
+  await expect(dayTotals).toHaveAttribute("aria-busy", "false");
   await page.unroute(progressPattern);
 
   let releasePreviousDay!: () => void;
@@ -66,12 +71,40 @@ test("shows the previous water total while another day loads", async ({
 
   await page
     .getByRole("link", { name: "Previous day" })
-    .dispatchEvent("mousedown", { button: 0 });
+    .dispatchEvent("pointerdown", { button: 0, isPrimary: true });
   await expect(total).toHaveText("0 ml");
-  await expect(total).toHaveAttribute("aria-busy", "true");
+  await expect(dayTotals).toHaveAttribute("aria-busy", "true");
 
   releasePreviousDay();
-  await expect(total).toHaveAttribute("aria-busy", "false");
+  await expect(dayTotals).toHaveAttribute("aria-busy", "false");
+});
+
+test("shows one retryable error when daily totals fail", async ({ page }) => {
+  await login(page);
+
+  const progressPattern = /\/api\/goals\?.*include=progress/;
+  let failing = true;
+  await page.route(progressPattern, (route) =>
+    failing
+      ? route.fulfill({ status: 500, body: "Could not load goals" })
+      : route.continue(),
+  );
+
+  await finishSetup(page);
+  const dayTotals = page.getByRole("region", { name: "Day totals" });
+  await expect(dayTotals.getByRole("alert")).toHaveText(
+    "Error loading daily totals",
+    { timeout: 10_000 },
+  );
+  await expect(dayTotals.getByRole("alert")).toHaveCount(1);
+  await expect(page.getByLabel("Calorie total")).toHaveCount(0);
+  await expect(page.getByLabel("Water total")).toHaveCount(0);
+
+  failing = false;
+  await dayTotals.getByRole("button", { name: "Try again" }).click();
+  await expect(page.getByLabel("Calorie total")).toHaveText("0 kcal");
+  await expect(page.getByLabel("Water total")).toHaveText("0 ml");
+  await expect(dayTotals.getByRole("alert")).toHaveCount(0);
 });
 
 test("logs water with the glass and bottle controls", async ({ page }) => {
@@ -132,12 +165,16 @@ test("logs water with the glass and bottle controls", async ({ page }) => {
   await markDocument(page);
   await page
     .getByRole("link", { name: "Previous day" })
-    .dispatchEvent("mousedown", { button: 0 });
+    .dispatchEvent("pointerdown", { button: 0, isPrimary: true });
   await expect(page).toHaveURL(/\?date=\d{4}-\d{2}-\d{2}$/);
   await expect(total).toHaveText("0 ml");
   await expectSameDocument(page);
 
-  await page.getByRole("link", { name: "Today" }).dispatchEvent("touchstart");
+  await page.getByRole("link", { name: "Today" }).dispatchEvent("pointerdown", {
+    button: 0,
+    isPrimary: true,
+    pointerType: "touch",
+  });
   await expect(page).toHaveURL((url) => url.pathname === "/" && !url.search);
   await expect(total).toHaveText("1,500 ml");
   await expectSameDocument(page);

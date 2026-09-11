@@ -1,4 +1,4 @@
-import { useReducedMotion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
   type KeyboardEvent,
   type PointerEvent,
@@ -69,6 +69,7 @@ export function WaterForm(props: { date: string }) {
   const [state, dispatch] = useReducer(waterReducer, initialState);
   const amount = state.amounts[state.selected];
   const { f } = useI18n();
+  const reducedMotion = useReducedMotion();
 
   return (
     <form
@@ -76,7 +77,10 @@ export function WaterForm(props: { date: string }) {
       onSubmit={(event) => {
         event.preventDefault();
         if (!addWater.isPending) {
-          addWater.mutate(amount);
+          addWater.mutate({
+            amount_ml: amount,
+            renderKey: crypto.randomUUID(),
+          });
         }
       }}
     >
@@ -103,13 +107,26 @@ export function WaterForm(props: { date: string }) {
         {f.number(amount)} ml
       </output>
 
-      {addWater.isError && (
-        <p className="mt-3 text-base text-danger-fg">
-          {addWater.error.message}
-        </p>
-      )}
-
       <div className="mt-5 w-full max-w-xs">
+        <AnimatePresence initial={false}>
+          {addWater.isError && (
+            <motion.p
+              role="alert"
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{
+                duration: reducedMotion ? 0 : 0.2,
+                ease: [0.16, 1, 0.3, 1],
+              }}
+              className="overflow-hidden"
+            >
+              <span className="mb-2 block rounded-lg bg-danger-surface px-2 py-1 text-sm text-danger-fg">
+                Error adding water
+              </span>
+            </motion.p>
+          )}
+        </AnimatePresence>
         <Button type="submit" className="w-full">
           {addWater.isPending ? "Adding…" : "Add water"}
         </Button>

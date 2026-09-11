@@ -48,7 +48,7 @@ test("sends only amount and date and updates both water views before saving", as
   await expect(entries.getByRole("listitem")).toHaveCount(1);
   await page
     .getByRole("link", { name: "Next day" })
-    .dispatchEvent("mousedown", { button: 0 });
+    .dispatchEvent("pointerdown", { button: 0, isPrimary: true });
   await expect(total).toHaveText("0 ml");
   await expect(entries.getByRole("listitem")).toHaveCount(0);
 });
@@ -77,15 +77,17 @@ test("rolls back both water views after failed adds and deletes", async ({
   } finally {
     releaseAdd();
   }
-  await expect(
-    page.getByText("Could not save water", { exact: true }),
-  ).toBeVisible();
+  const addError = page
+    .getByRole("region", { name: "Water" })
+    .getByRole("alert");
+  await expect(addError).toHaveText("Error adding water");
   await expect(total).toHaveText("0 ml");
   await expect(entries.getByRole("listitem")).toHaveCount(0);
 
   await page.unroute("**/api/water-entries");
   await page.getByRole("button", { name: "Add water" }).click();
   await expect(entries.getByRole("button")).toBeEnabled();
+  await expect(addError).toHaveCount(0);
   await expect(total).toHaveText("250 ml");
 
   let releaseDelete!: () => void;
@@ -100,19 +102,55 @@ test("rolls back both water views after failed adds and deletes", async ({
     await entries.getByRole("button").click();
     await expect(total).toHaveText("0 ml");
     await expect(entries.getByRole("listitem")).toHaveCount(0);
+    await expect(page.getByText("No water logged for this day")).toBeVisible();
   } finally {
     releaseDelete();
   }
   await expect(entries.getByRole("listitem").getByRole("alert")).toHaveText(
-    "error deleting entry",
+    "Error deleting water",
   );
   await expect(total).toHaveText("250 ml");
   await expect(entries.getByRole("listitem")).toHaveCount(1);
+  await expect(page.getByText("No water logged for this day")).toHaveCount(0);
 
   await page.unroute("**/api/water-entries/*");
+  let releaseSuccessfulDelete!: () => void;
+  const successfulDeleteGate = new Promise<void>((resolve) => {
+    releaseSuccessfulDelete = resolve;
+  });
+  await page.route("**/api/water-entries/*", async (route) => {
+    await successfulDeleteGate;
+    await route.continue();
+  });
+  const deleted = page.waitForResponse(
+    (response) => response.request().method() === "DELETE",
+  );
   await entries.getByRole("button").click();
   await expect(total).toHaveText("0 ml");
-  await expect(page.getByRole("alert")).toHaveCount(0);
+  const empty = page.getByText("No water logged for this day");
+  await expect(empty).toBeVisible();
+  await expect
+    .poll(() =>
+      entries
+        .locator("li")
+        .evaluateAll((elements) =>
+          elements.reduce(
+            (height, element) =>
+              height + element.getBoundingClientRect().height,
+            0,
+          ),
+        ),
+    )
+    .toBe(0);
+  const pendingEmptyTop = await empty.evaluate(
+    (element) => element.getBoundingClientRect().top,
+  );
+  releaseSuccessfulDelete();
+  expect((await deleted).ok()).toBe(true);
+  await expect(entries.locator("li")).toHaveCount(0);
+  expect(
+    await empty.evaluate((element) => element.getBoundingClientRect().top),
+  ).toBe(pendingEmptyTop);
   await page.reload();
   await expect(total).toHaveText("0 ml");
   await expect(entries.getByRole("listitem")).toHaveCount(0);
@@ -132,32 +170,29 @@ test("keeps the server total when the water entry list fails", async ({
 
   await page
     .getByRole("link", { name: "Settings" })
-    .dispatchEvent("mousedown", { button: 0 });
-  await page.route("**/api/water-entries?*", (route) =>
-    route.fulfill({ status: 500, body: "Water read failed" }),
-  );
+    .dispatchEvent("pointerdown", { button: 0, isPrimary: true });
+  let failing = true;
+  await page.route("**/api/water-entries?*", (route) => {
+    if (failing) {
+      return route.fulfill({ status: 500, body: "Water read failed" });
+    }
+    return route.continue();
+  });
   await page
     .getByRole("link", { name: "Today" })
-    .dispatchEvent("mousedown", { button: 0 });
+    .dispatchEvent("pointerdown", { button: 0, isPrimary: true });
 
-  const error = page.getByRole("region", { name: "Water" }).getByRole("alert");
-  await expect(error).toHaveText("Could not load the water entries.", {
+  const water = page.getByRole("region", { name: "Water" });
+  const error = water.getByRole("alert");
+  await expect(error).toContainText("Error loading water entries", {
     timeout: 15_000,
   });
   await expect(error).toHaveCount(1);
   await expect(total).toHaveText("250 ml");
-  // The summary and entry list load from separate sources.
-  await expect(entries.getByText("250 ml")).toBeVisible();
-
-  await page.reload();
-  await expect(error).toHaveText("Could not load the water entries.", {
-    timeout: 15_000,
-  });
-  await expect(total).toHaveText("250 ml");
   await expect(entries.getByRole("listitem")).toHaveCount(0);
 
-  await page.unroute("**/api/water-entries?*");
-  await page.reload();
+  failing = false;
+  await water.getByRole("button", { name: "Try again" }).click();
   await expect(total).toHaveText("250 ml");
   await expect(entries.getByText("250 ml")).toBeVisible();
   await expect(error).toHaveCount(0);

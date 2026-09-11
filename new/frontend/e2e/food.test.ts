@@ -96,6 +96,75 @@ test("keeps previous search results usable while the next search loads", async (
   );
 });
 
+test("retries failed meal loads", async ({ page }) => {
+  await login(page);
+  let failing = true;
+  await page.route("**/api/meals?*", (route) =>
+    failing
+      ? route.fulfill({ status: 500, body: "Meal read failed" })
+      : route.continue(),
+  );
+  await finishSetup(page);
+
+  const food = page.getByRole("region", { name: "Food", exact: true });
+  await expect(food.getByRole("alert")).toHaveText("Error loading meals", {
+    timeout: 15_000,
+  });
+  failing = false;
+  await food.getByRole("button", { name: "Try again" }).click();
+  await expect(food.getByText("No meals logged for this day")).toBeVisible();
+  await expect(food.getByRole("alert")).toHaveCount(0);
+});
+
+test("retries failed food searches", async ({ page }) => {
+  await login(page);
+  await finishSetup(page);
+  let failing = true;
+  await page.route("**/api/foods?q=apple", (route) =>
+    failing
+      ? route.fulfill({ status: 500, body: "Search failed" })
+      : route.continue(),
+  );
+
+  await page.getByRole("combobox", { name: "Search foods" }).fill("apple");
+  const error = page
+    .getByRole("alert")
+    .filter({ hasText: "Error searching foods" });
+  await expect(error).toBeVisible({ timeout: 15_000 });
+  failing = false;
+  await page.getByRole("button", { name: "Try again" }).click();
+  await expect(
+    page.getByRole("option", { name: "Apple Fineli" }),
+  ).toBeVisible();
+  await expect(error).toHaveCount(0);
+});
+
+test("retries failed food detail loads", async ({ page }) => {
+  await login(page);
+  await finishSetup(page);
+  const search = page.getByRole("combobox", { name: "Search foods" });
+  await search.fill("apple");
+  const apple = page.getByRole("option", { name: "Apple Fineli" });
+  await expect(apple).toBeVisible();
+
+  let failing = true;
+  await page.route("**/api/foods/*", (route) =>
+    failing
+      ? route.fulfill({ status: 500, body: "Food read failed" })
+      : route.continue(),
+  );
+  await apple.click();
+
+  const newFood = page.getByRole("region", { name: "New food" });
+  await expect(newFood.getByRole("alert")).toHaveText("Error loading food", {
+    timeout: 15_000,
+  });
+  failing = false;
+  await newFood.getByRole("button", { name: "Try again" }).click();
+  await expect(newFood.getByLabel("Amount (g)")).toBeVisible();
+  await expect(newFood.getByRole("alert")).toHaveCount(0);
+});
+
 test("searches, loads a skeleton, and logs and deletes food with keyboard", async ({
   page,
 }) => {
@@ -197,7 +266,7 @@ test("searches, loads a skeleton, and logs and deletes food with keyboard", asyn
   await page.getByRole("button", { name: "Delete Apple entry" }).click();
   expect((await deleted).ok()).toBe(true);
   await page.reload();
-  await expect(page.getByText("No food logged for this day.")).toBeVisible();
+  await expect(page.getByText("No meals logged for this day")).toBeVisible();
 });
 
 test("logs volume on a selected day and rolls back failed writes", async ({
@@ -230,7 +299,7 @@ test("logs volume on a selected day and rolls back failed writes", async ({
   await expect(page.getByRole("region", { name: "New food" })).toHaveCount(0);
   await expect(search).not.toBeFocused();
   release();
-  await expect(page.getByRole("alert")).toHaveText("Could not save food");
+  await expect(page.getByRole("alert")).toHaveText("Error adding food");
   await expect(entries.getByRole("listitem")).toHaveCount(0);
   await expect(amount).toHaveValue("250");
   await page.unroute("**/api/food-entries");
@@ -244,7 +313,7 @@ test("logs volume on a selected day and rolls back failed writes", async ({
   await page.reload();
   await expect(entries).toContainText("250 ml");
   await page.getByRole("link", { name: "Next day" }).click();
-  await expect(page.getByText("No food logged for this day.")).toBeVisible();
+  await expect(page.getByText("No meals logged for this day")).toBeVisible();
   await page.getByRole("link", { name: "Previous day" }).click();
   await expect(entries).toContainText("250 ml");
 });
@@ -311,7 +380,7 @@ test("continues meals and edits, cancels, retries and deletes inline", async ({
     else await route.continue();
   });
   await foods.getByRole("button", { name: "Save", exact: true }).click();
-  await expect(foods.getByRole("alert")).toHaveText("Could not update food");
+  await expect(foods.getByRole("alert")).toHaveText("Error updating food");
   await expect(foods.getByLabel("Amount (g)")).toHaveValue("200");
   await page.unroute("**/api/food-entries/*");
   await foods.getByRole("button", { name: "Save", exact: true }).click();
@@ -361,18 +430,48 @@ test("continues meals and edits, cancels, retries and deletes inline", async ({
       await route.fulfill({ status: 500, body: "Could not delete food" });
     } else await route.continue();
   });
+  const lastMeal = page.locator("article").filter({ hasText: "Apple juice" });
   await foods.getByRole("button", { name: "Delete Apple juice entry" }).click();
-  await expect(foods.locator("li[aria-hidden=true]")).toHaveCount(1);
+  await expect(lastMeal.locator("li[aria-hidden=true]")).toHaveCount(1);
+  await expect(lastMeal).toHaveAttribute("aria-hidden", "true");
+  await expect(page.getByText("No meals logged for this day")).toBeVisible();
   releaseDelete();
   await expect(foods.getByRole("alert")).toHaveText("Error deleting food");
+  await expect(lastMeal).not.toHaveAttribute("aria-hidden", "true");
+  await expect(page.getByText("No meals logged for this day")).toHaveCount(0);
   await expect(foods.getByLabel("Amount (ml)")).toHaveValue("200");
   await page.unroute("**/api/food-entries/*");
+  let releaseSuccessfulDelete!: () => void;
+  const successfulDeleteGate = new Promise<void>((resolve) => {
+    releaseSuccessfulDelete = resolve;
+  });
+  await page.route("**/api/food-entries/*", async (route) => {
+    if (route.request().method() === "DELETE") {
+      await successfulDeleteGate;
+    }
+    await route.continue();
+  });
   const deleted = page.waitForResponse(
     (response) => response.request().method() === "DELETE",
   );
   await foods.getByRole("button", { name: "Delete Apple juice entry" }).click();
+  await expect(page.getByText("No meals logged for this day")).toBeVisible();
+  await expect
+    .poll(() =>
+      lastMeal.evaluate((element) => element.getBoundingClientRect().height),
+    )
+    .toBe(0);
+  const empty = page.getByText("No meals logged for this day");
+  const pendingEmptyTop = await empty.evaluate(
+    (element) => element.getBoundingClientRect().top,
+  );
+  releaseSuccessfulDelete();
   expect((await deleted).ok()).toBe(true);
+  await expect(lastMeal).toHaveCount(0);
+  expect(
+    await empty.evaluate((element) => element.getBoundingClientRect().top),
+  ).toBe(pendingEmptyTop);
   await expect(foods).toHaveCount(0);
   await page.reload();
-  await expect(page.getByText("No food logged for this day.")).toBeVisible();
+  await expect(page.getByText("No meals logged for this day")).toBeVisible();
 });

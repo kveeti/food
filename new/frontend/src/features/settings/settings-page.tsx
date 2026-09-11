@@ -92,7 +92,7 @@ export default function SettingsPage(props: { user: User }) {
         </FormField>
 
         {mutation.isError && (
-          <p className="text-base text-danger-fg">{mutation.error.message}</p>
+          <p className="text-base text-danger-fg">Error saving settings</p>
         )}
 
         <div className="mt-2 flex justify-end">

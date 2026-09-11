@@ -79,7 +79,7 @@ export function GoalSettings() {
       {goals.isPending && <p className="mt-4 text-gray-600">Loading goals…</p>}
       {goals.isError && (
         <p role="alert" className="mt-4 text-danger-fg">
-          Could not load goals.
+          Error loading goals.
         </p>
       )}
       {goals.data && (
@@ -300,7 +300,7 @@ function GoalForm(props: { startsOn: string; goals: Goals }) {
 
       {mutation.isError && (
         <p role="alert" className="text-danger-fg">
-          {mutation.error.message}
+          Error saving goals
         </p>
       )}
       <div className="flex justify-end">

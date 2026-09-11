@@ -1,4 +1,5 @@
 import { Field as FormField, Form, setErrors, useForm } from "@formisch/react";
+import { AnimatePresence, motion } from "framer-motion";
 import * as v from "valibot";
 
 import {
@@ -8,6 +9,7 @@ import {
   useFoodQuery,
   useMealSuggestionQuery,
 } from "../../api/food.ts";
+import { useIsReducedMotion } from "../../lib/use-is-reduced-motion.ts";
 import { Button } from "../../ui/button/button.tsx";
 import { ChevronRightIcon } from "../../ui/chevron-right-icon.tsx";
 import { Field } from "../../ui/input/field.tsx";
@@ -41,6 +43,32 @@ export function SelectedFood(props: {
   mutation: ReturnType<typeof useAddFoodMutation>;
 }) {
   const food = useFoodQuery(props.id);
+
+  if (food.isError) {
+    return (
+      <div className="mt-4 rounded-2xl bg-danger-surface">
+        <div className="flex flex-wrap items-center justify-between gap-4 p-4">
+          <p role="alert" className="font-medium text-danger-fg">
+            Error loading food
+          </p>
+          <div className="ml-auto flex gap-2">
+            <Button type="button" variant="ghost" onClick={props.onClose}>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={food.isFetching}
+              onClick={() => void food.refetch()}
+            >
+              {food.isFetching ? "Retrying…" : "Try again"}
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="mt-4 rounded-2xl border border-gray-200 p-4">
       <div className="mb-4 min-h-[2lh]">
@@ -59,16 +87,8 @@ export function SelectedFood(props: {
           </div>
         )}
       </div>
-      {food.isError && (
-        <div role="alert" className="mb-4">
-          <p className="text-danger-fg">Could not load this food.</p>
-          <Button type="button" onClick={() => void food.refetch()}>
-            Try again
-          </Button>
-        </div>
-      )}
       <FoodAmountForm
-        food={food.isError ? undefined : food.data}
+        food={food.data}
         loading={food.isPending}
         date={props.date}
         mutation={props.mutation}
@@ -115,6 +135,7 @@ function FoodAmountForm(props: {
   mutation: ReturnType<typeof useAddFoodMutation>;
 }) {
   const mutation = props.mutation;
+  const isReducedMotion = useIsReducedMotion();
   const suggestion = useMealSuggestionQuery(props.date);
   const form = useForm({ schema, initialInput: { amount: "" } });
   return (
@@ -231,18 +252,30 @@ function FoodAmountForm(props: {
           </Field>
         )}
       </FormField>
-      {mutation.isError && mutation.variables?.food_id === props.food?.id && (
-        <p role="alert" className="text-danger-fg">
-          {mutation.error.message}
-        </p>
-      )}
-      <div className="flex justify-end gap-2">
-        <Button type="button" variant="ghost" onClick={props.onCancel}>
-          Cancel
-        </Button>
-        <Button type="submit" disabled={!props.food}>
-          {mutation.isPending ? "Adding…" : "Add food"}
-        </Button>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <AnimatePresence initial={false}>
+          {mutation.isError &&
+            mutation.variables?.food_id === props.food?.id && (
+              <motion.p
+                role="alert"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: isReducedMotion ? 0 : 0.16 }}
+                className="rounded-lg bg-danger-surface text-sm text-danger-fg"
+              >
+                <span className="block px-2 py-1">Error adding food</span>
+              </motion.p>
+            )}
+        </AnimatePresence>
+        <div className="ml-auto flex gap-2">
+          <Button type="button" variant="ghost" onClick={props.onCancel}>
+            Cancel
+          </Button>
+          <Button type="submit" disabled={!props.food}>
+            {mutation.isPending ? "Adding…" : "Add food"}
+          </Button>
+        </div>
       </div>
     </Form>
   );
