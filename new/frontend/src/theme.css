@@ -1,9 +1,17 @@
 :root {
-  --nav-height: 2.25rem;
-  --filterbar-height: 3.25rem;
-  --page-width: 35rem;
+  --page-max-width: 35rem;
+  --page-padding: 0.75rem;
 
-  --scrollbar-pl: calc(100vw - 100%);
+  --scrollbar-thumb: color-mix(
+    in oklab,
+    var(--color-gray-500) 45%,
+    transparent
+  );
+  --scrollbar-thumb-hover: color-mix(
+    in oklab,
+    var(--color-gray-600) 65%,
+    transparent
+  );
 
   --surface-canvas: oklch(98.8% 0.003 250deg);
   --surface-popover: var(--color-gray-25);
@@ -61,6 +69,12 @@
   --goal-water-solid: oklch(81% 0.14 252deg);
 }
 
+@media (min-width: 40rem) {
+  :root {
+    --page-padding: 1.75rem;
+  }
+}
+
 @media (prefers-color-scheme: dark) {
   :root {
     --red-fg: var(--color-red-625);
@@ -113,12 +127,6 @@
     --goal-calorie-solid: oklch(48% 0.1 68deg);
     --goal-water-soft: oklch(27% 0.04 252deg);
     --goal-water-solid: oklch(48% 0.11 252deg);
-  }
-}
-
-@media (display-mode: standalone) {
-  :root {
-    --nav-height: 3.5rem;
   }
 }
 

@@ -31,3 +31,13 @@ export async function finishSetup(page: Page) {
   await page.getByRole("button", { name: "Save", exact: true }).click();
   await expect(page).toHaveURL((url) => url.pathname === "/");
 }
+
+export async function openWaterDrawer(page: Page) {
+  await page.getByRole("button", { name: "Open water log" }).click();
+  await expect(page.getByRole("dialog", { name: "Water" })).toBeVisible();
+}
+
+export async function closeWaterDrawer(page: Page) {
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog", { name: "Water" })).not.toBeVisible();
+}

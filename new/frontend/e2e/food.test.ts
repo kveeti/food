@@ -51,6 +51,60 @@ test("counts Unicode search characters instead of bytes", async ({ page }) => {
   ).toBeVisible();
 });
 
+test("changes the selected day and food data while scrolling dates", async ({
+  page,
+}) => {
+  await login(page);
+  await finishSetup(page);
+
+  const selected = page.locator('[aria-current="date"]');
+  const dateStrip = page.getByLabel("Choose day");
+  await expect
+    .poll(() =>
+      Promise.all([dateStrip.boundingBox(), selected.boundingBox()]).then(
+        ([strip, day]) =>
+          strip && day
+            ? day.x + day.width / 2 - (strip.x + strip.width / 2)
+            : Number.POSITIVE_INFINITY,
+      ),
+    )
+    .toBeCloseTo(0, 0);
+  await expect
+    .poll(() =>
+      dateStrip.evaluate((element) => getComputedStyle(element).scrollbarWidth),
+    )
+    .toBe("none");
+  const nextDayBox = await page
+    .getByRole("button", { name: "Next day" })
+    .boundingBox();
+  expect(nextDayBox).not.toBeNull();
+  expect(nextDayBox!.x + nextDayBox!.width).toBeLessThanOrEqual(
+    page.viewportSize()!.width,
+  );
+  const initialDate = await selected.getAttribute("data-date");
+  expect(initialDate).not.toBeNull();
+  const target = new Date(`${initialDate}T12:00:00Z`);
+  target.setUTCDate(target.getUTCDate() + 3);
+  const targetDate = target.toISOString().slice(0, 10);
+  const mealsLoaded = page.waitForResponse(
+    (response) =>
+      response.request().method() === "GET" &&
+      new URL(response.url()).pathname === "/api/meals" &&
+      new URL(response.url()).searchParams.get("date") === targetDate,
+  );
+
+  await page.getByLabel("Choose day").evaluate((element) => {
+    element.scrollBy({ left: 72 * 3 });
+  });
+
+  await expect(page.locator(`[data-date="${targetDate}"]`)).toHaveAttribute(
+    "aria-current",
+    "date",
+  );
+  await expect(page).toHaveURL(new RegExp(`date=${targetDate}$`));
+  expect((await mealsLoaded).ok()).toBe(true);
+});
+
 test("keeps previous search results usable while the next search loads", async ({
   page,
 }) => {
@@ -256,6 +310,130 @@ test("searches, loads a skeleton, and logs and deletes food with keyboard", asyn
   const entries = foodSection.getByRole("list", { name: "Breakfast foods" });
   await expect(entries).toContainText("150.5 g");
   await expect(entries).toContainText("75 kcal");
+  const mealHeading = page.getByRole("heading", {
+    name: "Breakfast",
+    exact: true,
+  });
+  const mealHeader = mealHeading.locator("../..");
+  const foodName = entries.getByText("Apple", { exact: true });
+  const foodRow = entries
+    .getByRole("button", { name: "Edit Apple entry" })
+    .locator("../..");
+  const [
+    foodSectionBox,
+    mealHeaderBox,
+    mealHeadingBox,
+    foodNameBox,
+    foodRowBox,
+  ] = await Promise.all([
+    foodSection.boundingBox(),
+    mealHeader.boundingBox(),
+    mealHeading.boundingBox(),
+    foodName.boundingBox(),
+    foodRow.boundingBox(),
+  ]);
+  expect(foodSectionBox).not.toBeNull();
+  expect(mealHeaderBox).not.toBeNull();
+  expect(mealHeadingBox).not.toBeNull();
+  expect(foodNameBox).not.toBeNull();
+  expect(foodRowBox).not.toBeNull();
+  expect(mealHeaderBox!.x).toBeCloseTo(foodSectionBox!.x, 0);
+  expect(mealHeaderBox!.width).toBeCloseTo(foodSectionBox!.width, 0);
+  expect(foodRowBox!.x).toBeGreaterThan(mealHeaderBox!.x);
+  expect(mealHeadingBox!.x).toBeCloseTo(foodNameBox!.x, 0);
+
+  await page.setViewportSize({ width: 900, height: 900 });
+  const aligned = [
+    page.locator(".goal-card").first(),
+    page.locator(".nutrient-total").first(),
+    page.getByRole("combobox", { name: "Search foods" }),
+  ];
+  const wideMealHeadingBox = await mealHeading.boundingBox();
+  const wideMealHeaderBox = await mealHeader.boundingBox();
+  const wideSearchBox = await page
+    .getByRole("combobox", { name: "Search foods" })
+    .boundingBox();
+  expect(wideMealHeadingBox).not.toBeNull();
+  expect(wideMealHeaderBox).not.toBeNull();
+  expect(wideSearchBox).not.toBeNull();
+  expect(
+    wideMealHeaderBox!.y - (wideSearchBox!.y + wideSearchBox!.height),
+  ).toBeGreaterThanOrEqual(12);
+  for (const element of aligned) {
+    const box = await element.boundingBox();
+    expect(box).not.toBeNull();
+    expect(box!.x).toBeCloseTo(wideMealHeadingBox!.x, 0);
+  }
+  const dayNavigationStart = await page
+    .locator("[data-day-navigation-content]")
+    .evaluate((element) => {
+      const box = element.getBoundingClientRect();
+      const styles = getComputedStyle(element);
+      return box.x + Number.parseFloat(styles.paddingInlineStart);
+    });
+  expect(dayNavigationStart).toBeCloseTo(wideMealHeadingBox!.x, 0);
+
+  await page.setViewportSize({ width: 900, height: 300 });
+  await page
+    .locator("main")
+    .evaluate((element) => element.scrollTo(0, element.scrollHeight));
+  const stickyMealHeaderBox = await mealHeader.boundingBox();
+  const stickySearchBox = await page
+    .getByRole("combobox", { name: "Search foods" })
+    .boundingBox();
+  expect(stickyMealHeaderBox).not.toBeNull();
+  expect(stickySearchBox).not.toBeNull();
+  expect(
+    stickyMealHeaderBox!.y - (stickySearchBox!.y + stickySearchBox!.height),
+  ).toBeGreaterThanOrEqual(12);
+
+  await page.setViewportSize({ width: 1280, height: 900 });
+  const narrowSidebarCards = await page.locator(".goal-card").all();
+  const narrowCalorieBox = await narrowSidebarCards[0].boundingBox();
+  const narrowWaterBox = await narrowSidebarCards[1].boundingBox();
+  expect(narrowCalorieBox).not.toBeNull();
+  expect(narrowWaterBox).not.toBeNull();
+  expect(narrowWaterBox!.y).toBeGreaterThan(
+    narrowCalorieBox!.y + narrowCalorieBox!.height,
+  );
+
+  await page.setViewportSize({ width: 1400, height: 900 });
+  const desktopMealHeadingBox = await mealHeading.boundingBox();
+  const desktopMealHeaderBox = await mealHeader.boundingBox();
+  const desktopSearchBox = await page
+    .getByRole("combobox", { name: "Search foods" })
+    .boundingBox();
+  const desktopGoalBox = await page.locator(".goal-card").first().boundingBox();
+  const desktopNutrientBox = await page
+    .locator(".nutrient-total")
+    .first()
+    .boundingBox();
+  expect(desktopMealHeadingBox).not.toBeNull();
+  expect(desktopMealHeaderBox).not.toBeNull();
+  expect(desktopSearchBox).not.toBeNull();
+  expect(desktopGoalBox).not.toBeNull();
+  expect(desktopNutrientBox).not.toBeNull();
+  expect(
+    desktopMealHeaderBox!.y - (desktopSearchBox!.y + desktopSearchBox!.height),
+  ).toBeGreaterThanOrEqual(12);
+  expect(desktopGoalBox!.x + desktopGoalBox!.width).toBeLessThan(
+    desktopMealHeadingBox!.x,
+  );
+  expect(desktopNutrientBox!.x).toBeCloseTo(desktopGoalBox!.x, 0);
+  for (const element of aligned.slice(2)) {
+    const box = await element.boundingBox();
+    expect(box).not.toBeNull();
+    expect(box!.x).toBeCloseTo(desktopMealHeadingBox!.x, 0);
+  }
+
+  await page.setViewportSize({ width: 1600, height: 900 });
+  const wideCalorieBox = await page.locator(".goal-card").first().boundingBox();
+  const wideWaterBox = await page.locator(".goal-card").nth(1).boundingBox();
+  expect(wideCalorieBox).not.toBeNull();
+  expect(wideWaterBox).not.toBeNull();
+  expect(wideWaterBox!.y).toBeCloseTo(wideCalorieBox!.y, 0);
+
+  await page.setViewportSize({ width: 390, height: 844 });
   await page.reload();
   await expect(entries).toContainText("Apple");
   await expect(entries).toContainText("75 kcal");
@@ -312,9 +490,9 @@ test("logs volume on a selected day and rolls back failed writes", async ({
   await expect(search).not.toBeFocused();
   await page.reload();
   await expect(entries).toContainText("250 ml");
-  await page.getByRole("link", { name: "Next day" }).click();
+  await page.getByRole("button", { name: "Next day" }).click();
   await expect(page.getByText("No meals logged for this day")).toBeVisible();
-  await page.getByRole("link", { name: "Previous day" }).click();
+  await page.getByRole("button", { name: "Previous day" }).click();
   await expect(entries).toContainText("250 ml");
 });
 

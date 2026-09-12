@@ -1,0 +1,20 @@
+.input {
+  padding-inline: 0.75rem;
+}
+
+@supports (-webkit-touch-callout: none) {
+  .input {
+    padding-inline: 0;
+  }
+
+  .input::-webkit-date-and-time-value {
+    display: flex;
+    height: 100%;
+    align-items: center;
+    padding-inline-start: 0.75rem;
+  }
+
+  .input::-webkit-calendar-picker-indicator {
+    margin-inline-end: 0.75rem;
+  }
+}

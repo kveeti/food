@@ -9,6 +9,7 @@ import {
   useFoodQuery,
   useMealSuggestionQuery,
 } from "../../api/food.ts";
+import { createId } from "../../lib/id.ts";
 import { useIsReducedMotion } from "../../lib/use-is-reduced-motion.ts";
 import { Button } from "../../ui/button/button.tsx";
 import { ChevronRightIcon } from "../../ui/chevron-right-icon.tsx";
@@ -152,7 +153,7 @@ function FoodAmountForm(props: {
           document.activeElement.blur();
         try {
           await mutation.mutateAsync({
-            renderKey: crypto.randomUUID(),
+            renderKey: createId(),
             meal: selectedMeal,
             meal_id:
               selectedMeal === "continue_previous"

@@ -1,9 +1,10 @@
 import { expect, test } from "./fixtures.ts";
-import { finishSetup, login } from "./helpers.ts";
+import { finishSetup, login, openWaterDrawer } from "./helpers.ts";
 
 test("deletion errors stay on each failed row", async ({ page }) => {
   await login(page);
   await finishSetup(page);
+  await openWaterDrawer(page);
   const entries = page.getByRole("list", { name: "Water entries" });
   const total = page.getByLabel("Water total");
   await page.getByRole("button", { name: "Add water" }).click();
@@ -29,6 +30,7 @@ test("deletion errors stay on each failed row", async ({ page }) => {
   await expect(glass.getByRole("alert")).toHaveText("Error deleting water");
   await expect(total).toHaveText("1,250 ml");
   await page.reload();
+  await openWaterDrawer(page);
   await expect(page.getByRole("alert")).toHaveCount(0);
   await expect(entries.getByRole("listitem")).toHaveCount(2);
   await expect(total).toHaveText("1,250 ml");

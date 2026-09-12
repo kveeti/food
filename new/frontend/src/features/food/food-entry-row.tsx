@@ -24,7 +24,11 @@ import { useI18n } from "../i18n/use-i18n.tsx";
 import { amountSchema } from "./amount-schema.ts";
 
 const editFoodSchema = v.object({ amount: amountSchema });
-export function FoodEntryRow(props: { entry: FoodEntryView; date: string }) {
+export function FoodEntryRow(props: {
+  entry: FoodEntryView;
+  date: string;
+  last: boolean;
+}) {
   const [isEditing, setIsEditing] = useState(false);
   const headerButton = useRef<HTMLButtonElement>(null);
   const isReducedMotion = useIsReducedMotion();
@@ -59,82 +63,88 @@ export function FoodEntryRow(props: { entry: FoodEntryView; date: string }) {
         ease: [0.16, 1, 0.3, 1],
       }}
     >
-      <div className="relative py-2">
-        <motion.div
-          aria-hidden="true"
-          className="my-2 pointer-events-none absolute inset-0 rounded-[1.25rem] bg-gray-250"
-          initial={{ opacity: isReducedMotion ? 0 : 0.55 }}
-          animate={{ opacity: 0 }}
-          transition={{
-            delay: isReducedMotion ? 0 : 0.6,
-            duration: isReducedMotion ? 0 : 2.4,
-            ease: "easeOut",
-          }}
-        />
+      <div className="px-[var(--food-row-inset)]">
+        <div className="relative py-2">
+          <motion.div
+            aria-hidden="true"
+            className="my-2 pointer-events-none absolute inset-0 rounded-[1.25rem] bg-gray-250"
+            initial={{ opacity: isReducedMotion ? 0 : 0.55 }}
+            animate={{ opacity: 0 }}
+            transition={{
+              delay: isReducedMotion ? 0 : 0.6,
+              duration: isReducedMotion ? 0 : 2.4,
+              ease: "easeOut",
+            }}
+          />
 
-        <div
-          className={`group relative rounded-[1.25rem] transition-colors duration-200 motion-reduce:transition-none ${isEditing ? "bg-gray-100" : "hover:bg-gray-100"}`}
-        >
-          <div className="grid grid-cols-[minmax(0,1fr)_7rem_auto] grid-rows-[minmax(4.5rem,auto)_auto] items-start gap-x-1.5">
-            <button
-              ref={headerButton}
-              type="button"
-              aria-label={`${isEditing ? "Close" : "Edit"} ${props.entry.food_name} entry`}
-              onClick={toggle}
-              disabled={!savedEntry}
-              className="col-span-3 col-start-1 row-start-1 grid self-stretch grid-cols-subgrid rounded-[1.25rem] text-left font-[inherit] outline-2 outline-transparent outline-offset-2 focus-visible:outline-gray-500"
-            >
-              <span className="col-start-1 row-start-1 flex min-w-0 items-start justify-start pt-3 pb-2 pl-5">
-                <FoodIdentity entry={props.entry} />
-              </span>
+          <div
+            className={`group relative rounded-[1.25rem] transition-colors duration-200 motion-reduce:transition-none ${isEditing ? "bg-gray-100" : "hover:bg-gray-100"}`}
+          >
+            <div className="grid grid-cols-[minmax(0,1fr)_7rem_auto] grid-rows-[minmax(4.5rem,auto)_auto] items-start gap-x-1.5">
+              <button
+                ref={headerButton}
+                type="button"
+                aria-label={`${isEditing ? "Close" : "Edit"} ${props.entry.food_name} entry`}
+                onClick={toggle}
+                disabled={!savedEntry}
+                className="col-span-3 col-start-1 row-start-1 grid self-stretch grid-cols-subgrid rounded-[1.25rem] text-left font-[inherit] outline-2 outline-transparent outline-offset-2 focus-visible:outline-gray-500"
+              >
+                <span className="col-start-1 row-start-1 flex min-w-0 items-start justify-start pt-3 pb-2 pl-[calc(var(--page-padding)-var(--food-row-inset))]">
+                  <FoodIdentity entry={props.entry} />
+                </span>
+
+                <AnimatePresence initial={false} mode="sync">
+                  {!isEditing && (
+                    <motion.span
+                      key="amount-summary"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: isReducedMotion ? 0 : 0.16 }}
+                      className="col-start-2 row-start-1 py-3 text-right tabular-nums"
+                    >
+                      <span className="block font-medium text-gray-700">
+                        {f.amount(props.entry.amount)} {props.entry.unit}
+                      </span>
+                      <span className="block text-sm text-gray-600">
+                        {energy
+                          ? `${f.calories(energy.value)} kcal`
+                          : "-- kcal"}
+                      </span>
+                    </motion.span>
+                  )}
+                </AnimatePresence>
+
+                <span className="col-start-3 row-start-1 grid self-stretch place-items-center pr-1.5 text-gray-600">
+                  <span className="grid size-6 place-items-center">
+                    <ChevronRightIcon
+                      className={`transition-transform duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none ${isEditing ? "rotate-90" : ""}`}
+                    />
+                  </span>
+                </span>
+              </button>
 
               <AnimatePresence initial={false} mode="sync">
-                {!isEditing && (
-                  <motion.span
-                    key="amount-summary"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: isReducedMotion ? 0 : 0.16 }}
-                    className="col-start-2 row-start-1 py-3 text-right tabular-nums"
-                  >
-                    <span className="block font-medium text-gray-700">
-                      {f.amount(props.entry.amount)} {props.entry.unit}
-                    </span>
-                    <span className="block text-sm text-gray-600">
-                      {energy ? `${f.calories(energy.value)} kcal` : "-- kcal"}
-                    </span>
-                  </motion.span>
+                {isEditing && savedEntry && (
+                  <FoodEntryEditor
+                    key="editor"
+                    entry={savedEntry}
+                    date={props.date}
+                    reducedMotion={isReducedMotion}
+                    deletion={deletion}
+                    onClose={toggle}
+                  />
                 )}
               </AnimatePresence>
-
-              <span className="col-start-3 row-start-1 grid self-stretch place-items-center pr-1.5 text-gray-600">
-                <span className="grid size-6 place-items-center">
-                  <ChevronRightIcon
-                    className={`transition-transform duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none ${isEditing ? "rotate-90" : ""}`}
-                  />
-                </span>
-              </span>
-            </button>
-
-            <AnimatePresence initial={false} mode="sync">
-              {isEditing && savedEntry && (
-                <FoodEntryEditor
-                  key="editor"
-                  entry={savedEntry}
-                  date={props.date}
-                  reducedMotion={isReducedMotion}
-                  deletion={deletion}
-                  onClose={toggle}
-                />
-              )}
-            </AnimatePresence>
+            </div>
           </div>
+          {!props.last && (
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-x-5 bottom-0 border-b border-gray-200"
+            />
+          )}
         </div>
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-x-5 bottom-0 border-b border-gray-200"
-        />
       </div>
     </motion.li>
   );

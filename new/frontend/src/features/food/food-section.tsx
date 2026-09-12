@@ -36,17 +36,16 @@ export function FoodSection(props: { date: string }) {
   );
 
   return (
-    <section aria-labelledby="food-heading" className="mt-8">
-      <h2 id="food-heading" className="mb-4 text-lg font-medium text-gray-950">
-        Food
-      </h2>
+    <div>
       {meals.isPending ? (
         <FoodMealsSkeleton />
       ) : meals.isError ? (
-        <FoodMealsError
-          retrying={meals.isFetching}
-          onRetry={() => void meals.refetch()}
-        />
+        <div className="px-[var(--page-padding)]">
+          <FoodMealsError
+            retrying={meals.isFetching}
+            onRetry={() => void meals.refetch()}
+          />
+        </div>
       ) : (
         <div
           aria-busy={meals.isPlaceholderData}
@@ -59,10 +58,14 @@ export function FoodSection(props: { date: string }) {
             meals={meals.meals}
             deletingMealIds={deletingMealIds}
           />
-          {deletingMealIds.size === meals.meals.length && <FoodEmptyState />}
+          {deletingMealIds.size === meals.meals.length && (
+            <div className="px-[var(--page-padding)]">
+              <FoodEmptyState />
+            </div>
+          )}
         </div>
       )}
-    </section>
+    </div>
   );
 }
 
@@ -125,19 +128,21 @@ function FoodMealsSkeleton() {
       className="motion-safe:animate-pulse"
     >
       <div aria-hidden="true">
-        <div className="rounded-xl bg-gray-100">
-          <div className="flex min-h-12 items-center justify-between gap-4 px-3 py-2">
+        <div className="bg-gray-100 sm:rounded-xl">
+          <div className="flex min-h-12 items-center justify-between gap-4 px-[var(--page-padding)] py-2">
             <div className="h-5 w-24 rounded bg-gray-200" />
             <div className="h-4 w-28 rounded bg-gray-200" />
           </div>
         </div>
-        <div className="flex min-h-14 items-center justify-between gap-4 border-b border-gray-200 px-2">
-          <div className="h-5 w-36 rounded bg-gray-200" />
-          <div className="h-4 w-20 rounded bg-gray-200" />
-        </div>
-        <div className="flex min-h-14 items-center justify-between gap-4 border-b border-gray-200 px-2">
-          <div className="h-5 w-28 rounded bg-gray-200" />
-          <div className="h-4 w-20 rounded bg-gray-200" />
+        <div className="px-[var(--page-padding)]">
+          <div className="flex min-h-14 items-center justify-between gap-4 px-2">
+            <div className="h-5 w-36 rounded bg-gray-200" />
+            <div className="h-4 w-20 rounded bg-gray-200" />
+          </div>
+          <div className="flex min-h-14 items-center justify-between gap-4 border-b border-gray-200 px-2">
+            <div className="h-5 w-28 rounded bg-gray-200" />
+            <div className="h-4 w-20 rounded bg-gray-200" />
+          </div>
         </div>
       </div>
     </div>
@@ -209,27 +214,30 @@ function FoodMeal(props: {
       aria-labelledby={`meal-${props.id}`}
     >
       <div className={props.first ? undefined : "mt-6"}>
-        <header className="-mx-3 flex min-h-12 items-center justify-between gap-4 rounded-xl bg-gray-100 px-3 py-2">
-          <h3 id={`meal-${props.id}`} className="font-medium text-gray-950">
-            {props.meal.name ?? "Meal"}
-          </h3>
-          <p className="shrink-0 text-right text-sm tabular-nums text-gray-600">
-            <time dateTime={props.meal.started_at}>
-              {f.time(new Date(props.meal.started_at))}
-            </time>
-            {" · "}
-            {energy.length
-              ? `${f.calories(energy.reduce((total, nutrient) => total + nutrient.value, 0))} kcal`
-              : "Energy unknown"}
-          </p>
+        <header className="sticky top-0 z-[5] bg-gray-100 sm:top-[calc(var(--desktop-day-navigation-height)+var(--desktop-search-height))] sm:rounded-xl">
+          <div className="flex min-h-12 items-center justify-between gap-4 px-[var(--page-padding)] py-2">
+            <h3 id={`meal-${props.id}`} className="font-medium text-gray-950">
+              {props.meal.name ?? "Meal"}
+            </h3>
+            <p className="shrink-0 text-right text-sm tabular-nums text-gray-600">
+              <time dateTime={props.meal.started_at}>
+                {f.time(new Date(props.meal.started_at))}
+              </time>
+              {" · "}
+              {energy.length
+                ? `${f.calories(energy.reduce((total, nutrient) => total + nutrient.value, 0))} kcal`
+                : "Energy unknown"}
+            </p>
+          </div>
         </header>
         <ul aria-label={`${props.meal.name ?? "Meal"} foods`}>
           <AnimatePresence initial={props.animateEntries}>
-            {props.meal.entries.map((entry) => (
+            {props.meal.entries.map((entry, index) => (
               <FoodEntryRow
                 key={entry.renderKey}
                 entry={entry}
                 date={props.date}
+                last={index === props.meal.entries.length - 1}
               />
             ))}
           </AnimatePresence>

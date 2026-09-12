@@ -1,5 +1,11 @@
 import { expect, test } from "./fixtures.ts";
-import { expectSameDocument, login, markDocument } from "./helpers.ts";
+import {
+  closeWaterDrawer,
+  expectSameDocument,
+  login,
+  markDocument,
+  openWaterDrawer,
+} from "./helpers.ts";
 
 test("uses saved locale and timezone for dates, food, and water", async ({
   page,
@@ -13,8 +19,9 @@ test("uses saved locale and timezone for dates, food, and water", async ({
     "11. tammikuuta 2026",
   );
   await markDocument(page);
+  await openWaterDrawer(page);
 
-  const water = page.getByRole("region", { name: "Water" });
+  const water = page.getByRole("dialog", { name: "Water" });
   const total = page.getByLabel("Water total");
   const waterEntries = page.getByRole("list", { name: "Water entries" });
   const bottle = page.getByRole("slider", { name: "Bottle amount" });
@@ -43,6 +50,7 @@ test("uses saved locale and timezone for dates, food, and water", async ({
       timeZone: "Pacific/Kiritimati",
     }).format(new Date(waterEntry.consumed_at)),
   );
+  await closeWaterDrawer(page);
 
   const search = page.getByRole("combobox", { name: "Search foods" });
   await search.fill("apple");
@@ -76,17 +84,27 @@ test("uses saved locale and timezone for dates, food, and water", async ({
   );
 
   await page
-    .getByRole("link", { name: "Settings" })
+    .getByRole("link", { name: "You" })
     .dispatchEvent("pointerdown", { button: 0, isPrimary: true });
+  const localeSaved = page.waitForResponse(
+    (response) =>
+      response.url().endsWith("/api/settings") &&
+      response.request().method() === "PUT",
+  );
   await page.getByLabel("Locale").fill("en-US");
-  await page.getByRole("button", { name: "Save", exact: true }).click();
+  expect((await localeSaved).ok()).toBe(true);
+  await expect(page.getByRole("status")).toContainText("Saved");
+  await page
+    .getByRole("link", { name: "Today" })
+    .dispatchEvent("pointerdown", { button: 0, isPrimary: true });
   await expectSameDocument(page);
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(
     "January 11, 2026",
   );
   await expect(total).toHaveText("1,500 ml");
-  await expect(waterEntries).toContainText("1,500 ml");
   await expect(foodEntries).toContainText("75 kcal");
+  await openWaterDrawer(page);
+  await expect(waterEntries).toContainText("1,500 ml");
   await expect(waterEntries.locator("time")).toHaveText(
     new Intl.DateTimeFormat("en-US", {
       hour: "numeric",
@@ -94,21 +112,29 @@ test("uses saved locale and timezone for dates, food, and water", async ({
       timeZone: "Pacific/Kiritimati",
     }).format(new Date(waterEntry.consumed_at)),
   );
+  await closeWaterDrawer(page);
 
   await page
-    .getByRole("link", { name: "Settings" })
+    .getByRole("link", { name: "You" })
     .dispatchEvent("pointerdown", { button: 0, isPrimary: true });
+  const timezoneSaved = page.waitForResponse(
+    (response) =>
+      response.url().endsWith("/api/settings") &&
+      response.request().method() === "PUT",
+  );
   await page.getByLabel("Timezone").fill("Pacific/Honolulu");
-  await page.getByRole("button", { name: "Save", exact: true }).click();
+  expect((await timezoneSaved).ok()).toBe(true);
+  await expect(page.getByRole("status")).toContainText("Saved");
+  await page
+    .getByRole("link", { name: "Today" })
+    .dispatchEvent("pointerdown", { button: 0, isPrimary: true });
   await expectSameDocument(page);
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(
     "January 10, 2026",
   );
-  await page
-    .getByRole("link", { name: "Next day" })
-    .dispatchEvent("pointerdown", { button: 0, isPrimary: true });
+  await page.getByRole("button", { name: "Next day" }).click();
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(
     "January 11, 2026",
   );
-  await expect(page.getByText("Sunday", { exact: true })).toBeVisible();
+  await expect(page.locator('[aria-current="date"]')).toContainText("Sun");
 });

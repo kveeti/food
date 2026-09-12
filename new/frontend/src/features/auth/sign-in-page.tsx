@@ -1,6 +1,6 @@
 export default function SignInPage() {
   return (
-    <main className="mx-auto flex min-h-dvh max-w-[var(--page-width)] items-center px-4 py-10">
+    <main className="mx-auto flex h-full max-w-[var(--page-max-width)] items-center overflow-y-auto overscroll-contain px-4 py-10">
       <div>
         <h1 className="text-[1.5rem] font-semibold tracking-tight text-gray-950">
           Sign in to Food

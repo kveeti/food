@@ -1,9 +1,11 @@
 import { expect, test } from "./fixtures.ts";
 import {
+  closeWaterDrawer,
   expectSameDocument,
   finishSetup,
   login,
   markDocument,
+  openWaterDrawer,
 } from "./helpers.ts";
 
 test("requires and saves locale and timezone", async ({ page }) => {
@@ -22,7 +24,7 @@ test("requires and saves locale and timezone", async ({ page }) => {
   await expectSameDocument(page);
 
   await page
-    .getByRole("link", { name: "Settings" })
+    .getByRole("link", { name: "You" })
     .dispatchEvent("pointerdown", { button: 0, isPrimary: true });
   await expect(page).toHaveURL(/\/settings$/);
   await expectSameDocument(page);
@@ -69,9 +71,7 @@ test("shows the previous water total while another day loads", async ({
     await route.continue();
   });
 
-  await page
-    .getByRole("link", { name: "Previous day" })
-    .dispatchEvent("pointerdown", { button: 0, isPrimary: true });
+  await page.getByRole("button", { name: "Previous day" }).click();
   await expect(total).toHaveText("0 ml");
   await expect(dayTotals).toHaveAttribute("aria-busy", "true");
 
@@ -113,6 +113,7 @@ test("logs water with the glass and bottle controls", async ({ page }) => {
 
   const total = page.getByLabel("Water total");
   await expect(total).toHaveText("0 ml");
+  await openWaterDrawer(page);
 
   const glass = page.getByRole("slider", { name: "Glass amount" });
   await expect(glass).toHaveAttribute("aria-valuenow", "250");
@@ -162,10 +163,9 @@ test("logs water with the glass and bottle controls", async ({ page }) => {
   await expect(total).toHaveText("1,500 ml");
   await expect(entries.getByText("300 ml")).toHaveCount(0);
 
+  await closeWaterDrawer(page);
   await markDocument(page);
-  await page
-    .getByRole("link", { name: "Previous day" })
-    .dispatchEvent("pointerdown", { button: 0, isPrimary: true });
+  await page.getByRole("button", { name: "Previous day" }).click();
   await expect(page).toHaveURL(/\?date=\d{4}-\d{2}-\d{2}$/);
   await expect(total).toHaveText("0 ml");
   await expectSameDocument(page);

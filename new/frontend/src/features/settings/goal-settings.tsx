@@ -1,10 +1,4 @@
-import {
-  Field as FormField,
-  Form,
-  setErrors,
-  setInput,
-  useForm,
-} from "@formisch/react";
+import { Field as FormField, Form, setInput, useForm } from "@formisch/react";
 import { useState } from "react";
 import * as v from "valibot";
 
@@ -14,7 +8,9 @@ import {
   useGoalsQuery,
   useSaveGoalsMutation,
 } from "../../api/goals.ts";
+import { type SaveStatus, useAutosave } from "../../lib/use-autosave.ts";
 import { Button } from "../../ui/button/button.tsx";
+import { DateInput } from "../../ui/input/date-input.tsx";
 import { Field } from "../../ui/input/field.tsx";
 import { Input } from "../../ui/input/input.tsx";
 import { useI18n } from "../i18n/use-i18n.tsx";
@@ -42,19 +38,32 @@ const optionalWater = v.union([
   ),
 ]);
 
-const schema = v.object({
-  dailyBurn: optionalPositive,
-  adjustment: number,
-  water: optionalWater,
-  nutrients: v.array(
-    v.object({
-      code: v.string(),
-      value: optionalPositive,
-    }),
+const schema = v.pipe(
+  v.object({
+    dailyBurn: optionalPositive,
+    adjustment: number,
+    water: optionalWater,
+    nutrients: v.array(
+      v.object({
+        code: v.string(),
+        value: optionalPositive,
+      }),
+    ),
+  }),
+  v.forward(
+    v.partialCheck(
+      [["dailyBurn"], ["adjustment"]],
+      (values) =>
+        values.dailyBurn === "" || values.dailyBurn + values.adjustment > 0,
+      "The calorie goal must be greater than 0",
+    ),
+    ["adjustment"],
   ),
-});
+);
 
-export function GoalSettings() {
+export function GoalSettings(props: {
+  onSaveStatusChange: (status: SaveStatus) => void;
+}) {
   const { f } = useI18n();
   const [startsOn, setStartsOn] = useState(f.dateKey(new Date()));
   const goals = useGoalsQuery(startsOn);
@@ -70,8 +79,7 @@ export function GoalSettings() {
         </p>
       </header>
       <Field label="Start date">
-        <Input
-          type="date"
+        <DateInput
           value={startsOn}
           onChange={(event) => setStartsOn(event.currentTarget.value)}
         />
@@ -83,13 +91,22 @@ export function GoalSettings() {
         </p>
       )}
       {goals.data && (
-        <GoalForm key={startsOn} startsOn={startsOn} goals={goals.data} />
+        <GoalForm
+          key={startsOn}
+          startsOn={startsOn}
+          goals={goals.data}
+          onSaveStatusChange={props.onSaveStatusChange}
+        />
       )}
     </section>
   );
 }
 
-function GoalForm(props: { startsOn: string; goals: Goals }) {
+function GoalForm(props: {
+  startsOn: string;
+  goals: Goals;
+  onSaveStatusChange: (status: SaveStatus) => void;
+}) {
   const { f } = useI18n();
   const mutation = useSaveGoalsMutation();
   const [shownCodes, setShownCodes] = useState(() =>
@@ -115,38 +132,39 @@ function GoalForm(props: { startsOn: string; goals: Goals }) {
   const available = props.goals.nutrients.filter(
     (nutrient) => !shownCodes.includes(nutrient.code),
   );
+  const autosave = useAutosave({
+    form,
+    save: async (values) => {
+      const burn = optionalValue(values.dailyBurn);
+      const adjustment = burn === null ? null : values.adjustment;
+      await mutation.mutateAsync({
+        starts_on: props.startsOn,
+        daily_burn_kcal: burn,
+        food_adjustment_kcal: adjustment,
+        water_ml: optionalValue(values.water),
+        nutrients: values.nutrients.flatMap((nutrient) =>
+          nutrient.value === ""
+            ? []
+            : [{ code: nutrient.code, value: nutrient.value }],
+        ),
+      });
+    },
+    onStatusChange: props.onSaveStatusChange,
+  });
 
   return (
     <Form
       of={form}
-      className="mt-5 space-y-6"
-      onSubmit={async (values) => {
-        if (mutation.isPending) return;
-        const burn = optionalValue(values.dailyBurn);
-        const adjustment = burn === null ? null : values.adjustment;
-        if (burn !== null && burn + values.adjustment <= 0) {
-          setErrors(form, {
-            path: ["adjustment"],
-            errors: ["The calorie goal must be greater than 0"],
-          });
-          return;
-        }
-        try {
-          await mutation.mutateAsync({
-            starts_on: props.startsOn,
-            daily_burn_kcal: burn,
-            food_adjustment_kcal: adjustment,
-            water_ml: optionalValue(values.water),
-            nutrients: values.nutrients.flatMap((nutrient) =>
-              nutrient.value === ""
-                ? []
-                : [{ code: nutrient.code, value: nutrient.value }],
-            ),
-          });
-        } catch {
-          // The mutation error is shown below.
+      className="mt-5 min-w-0 space-y-6"
+      onChange={(event) => {
+        if (event.target instanceof HTMLInputElement) autosave.schedule();
+      }}
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget)) {
+          autosave.flush();
         }
       }}
+      onSubmit={() => autosave.flush()}
     >
       <div>
         <h3 className="mb-3 font-medium text-gray-950">Calories</h3>
@@ -261,6 +279,7 @@ function GoalForm(props: { startsOn: string; goals: Goals }) {
                           setShownCodes((codes) =>
                             codes.filter((code) => code !== nutrient.code),
                           );
+                          autosave.schedule();
                         }}
                       >
                         Remove
@@ -285,7 +304,7 @@ function GoalForm(props: { startsOn: string; goals: Goals }) {
                   ]);
                 }
               }}
-              className="h-10 w-full rounded-xl border border-transparent bg-[var(--input-bg)] px-3 font-[inherit] text-gray-1000 outline-2 outline-transparent outline-offset-[-1px] hover:bg-[var(--input-bg-alt)] focus-visible:outline-[var(--input-ring-active)]"
+              className="h-10 min-w-0 max-w-full w-full rounded-xl border border-transparent bg-[var(--input-bg)] px-3 font-[inherit] text-gray-1000 outline-2 outline-transparent outline-offset-[-1px] hover:bg-[var(--input-bg-alt)] focus-visible:outline-[var(--input-ring-active)]"
             >
               <option value="">Choose a nutrient</option>
               {available.map((nutrient) => (
@@ -303,11 +322,6 @@ function GoalForm(props: { startsOn: string; goals: Goals }) {
           Error saving goals
         </p>
       )}
-      <div className="flex justify-end">
-        <Button type="submit">
-          {mutation.isPending ? "Saving…" : "Save goals"}
-        </Button>
-      </div>
     </Form>
   );
 }

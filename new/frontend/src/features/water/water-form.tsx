@@ -8,6 +8,7 @@ import {
 } from "react";
 
 import { useAddWaterMutation } from "../../api/water.ts";
+import { createId } from "../../lib/id.ts";
 import { Button } from "../../ui/button/button.tsx";
 import { useI18n } from "../i18n/use-i18n.tsx";
 
@@ -79,7 +80,7 @@ export function WaterForm(props: { date: string }) {
         if (!addWater.isPending) {
           addWater.mutate({
             amount_ml: amount,
-            renderKey: crypto.randomUUID(),
+            renderKey: createId(),
           });
         }
       }}
@@ -176,6 +177,7 @@ function WaterVessel(props: {
       role="slider"
       tabIndex={0}
       data-selected={props.selected}
+      data-base-ui-swipe-ignore={props.selected || undefined}
       aria-label={`${vessel.label} amount`}
       aria-current={props.selected}
       aria-valuemin={vessel.min}

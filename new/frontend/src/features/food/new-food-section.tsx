@@ -33,7 +33,7 @@ export function NewFoodSection(props: { date: string; onClose: () => void }) {
           aria-hidden={submitting || undefined}
           inert={submitting}
           className="overflow-hidden"
-          initial={{ opacity: 0, height: 0 }}
+          initial={{ opacity: 0, height: "auto" }}
           animate={{
             opacity: submitting ? 0 : 1,
             height: submitting ? 0 : "auto",
