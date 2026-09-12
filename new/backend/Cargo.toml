@@ -5,6 +5,12 @@ edition = "2024"
 
 [features]
 test-support = []
+import-tools = ["dep:csv", "dep:encoding_rs", "dep:flate2"]
+
+[[bin]]
+name = "import-foods"
+path = "src/bin/import_foods/main.rs"
+required-features = ["import-tools"]
 
 [[bin]]
 name = "seed-test-catalog"
@@ -17,6 +23,9 @@ anyhow = "1"
 base64 = "0.22"
 chrono = { version = "0.4", features = ["serde"] }
 chrono-tz = "0.10"
+csv = { version = "1.3", optional = true }
+encoding_rs = { version = "0.8", optional = true }
+flate2 = { version = "1", default-features = false, features = ["zlib"], optional = true }
 jsonwebtoken = { version = "9.3", default-features = false }
 language-tags = "0.3"
 opentelemetry = "0.32"

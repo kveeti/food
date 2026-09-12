@@ -42,6 +42,41 @@ deno task e2e:browsers
 
 Run the app with `topcoat dev --bin food` or use the Make commands above
 
+## Food catalog imports
+
+Import Fineli from an extracted release directory:
+
+```sh
+cargo run --features import-tools --bin import-foods -- \
+  fineli "$HOME/Downloads/Fineli_rel20_74"
+```
+
+Extract Finnish products from a full OFF export or delta on the machine that
+stores it:
+
+```sh
+scripts/extract-off-finland.sh openfoodfacts-products.jsonl.gz off-finland.jsonl.gz
+```
+
+Import a full feed with the Unix time or HTTP date published for that OFF
+export. Do not use a timestamp changed by copying the file:
+
+```sh
+cargo run --features import-tools --bin import-foods -- \
+  off-full --snapshot-end 'Sun, 23 Aug 2026 13:20:00 GMT' off-finland.jsonl.gz
+```
+
+Apply extracted deltas in order:
+
+```sh
+cargo run --features import-tools --bin import-foods -- \
+  off-delta --start 1787480400 --end 1787566800 off-finland-delta.jsonl.gz
+```
+
+The importer reads gzip files and also accepts `-` for standard input. Full and
+delta merges use staged batches and leave the live catalog unchanged if parsing
+or validation fails.
+
 ## Testing
 
 With or without Nix:

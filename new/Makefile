@@ -44,8 +44,8 @@ build: frontend/node_modules/.modules.yaml
 
 check: frontend/node_modules/.modules.yaml
 	@cargo fmt --manifest-path backend/Cargo.toml --check
-	@cargo test --manifest-path backend/Cargo.toml --bins
-	@cargo clippy --manifest-path backend/Cargo.toml --bins -- -D warnings
+	@cargo test --manifest-path backend/Cargo.toml --bins --features import-tools
+	@cargo clippy --manifest-path backend/Cargo.toml --bins --features import-tools -- -D warnings
 	@cd frontend && pnpm run fmt:check && pnpm run lint && pnpm run typecheck
 
 # Each Playwright test gets a new database on the dev-shell PostgreSQL server.
