@@ -310,11 +310,12 @@ test("searches, loads a skeleton, and logs and deletes food with keyboard", asyn
   const entries = foodSection.getByRole("list", { name: "Breakfast foods" });
   await expect(entries).toContainText("150.5 g");
   await expect(entries).toContainText("75 kcal");
-  const mealHeading = page.getByRole("heading", {
-    name: "Breakfast",
-    exact: true,
-  });
-  const mealHeader = mealHeading.locator("../..");
+  const mealHeading = page
+    .getByRole("heading", { name: "Breakfast", exact: true })
+    .getByText("Breakfast", { exact: true });
+  const mealHeader = foodSection
+    .getByRole("article", { name: "Breakfast", exact: true })
+    .locator("header");
   const foodName = entries.getByText("Apple", { exact: true });
   const foodRow = entries
     .getByRole("button", { name: "Edit Apple entry" })

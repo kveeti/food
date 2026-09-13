@@ -46,7 +46,7 @@ tracing-forest = "0.3"
 tracing-opentelemetry = "0.33"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 url = "2"
-uuid = { version = "1", features = ["v7"] }
+uuid = { version = "1", features = ["v7", "serde"] }
 
 [profile.dev]
 debug = true

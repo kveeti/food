@@ -110,9 +110,10 @@ export function useFoodQuery(id: string) {
 
 const mealsKey = (date: string) => ["meals", date] as const;
 
-export function useFoodMealsQuery(date: string) {
+export function useFoodMealsQuery(date: string, isEnabled = true) {
   const query = useQuery<CachedFoodMeal[]>({
     queryKey: mealsKey(date),
+    enabled: isEnabled,
     queryFn: ({ signal }) =>
       api<FoodMeal[]>(`/api/meals?date=${date}`, { signal }),
     placeholderData: keepPreviousData,
@@ -266,6 +267,60 @@ export function useAddFoodMutation(date: string) {
       void client.invalidateQueries({ queryKey: ["meal-suggestion", date] });
     },
     onSettled: () => {
+      if (client.isMutating({ mutationKey: ["food-entry", date] }) === 1) {
+        void client.invalidateQueries({ queryKey });
+        void client.invalidateQueries({ queryKey: ["goals", date] });
+      }
+    },
+  });
+}
+
+export type CopyMealInput = {
+  sourceMealId: string;
+  date: string;
+  target:
+    | {
+        kind: "new";
+        meal: Exclude<MealChoice, "continue_previous">;
+        time: string;
+      }
+    | { kind: "existing"; meal_id: string };
+  entries: { entry_id: string; amount: number }[];
+};
+
+export function useCopyMealMutation() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ sourceMealId, ...input }: CopyMealInput) =>
+      api<{ meal_id: string }>(`/api/meals/${sourceMealId}/copy`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(input),
+      }),
+    onSuccess: (_data, input) =>
+      Promise.all([
+        client.invalidateQueries({ queryKey: mealsKey(input.date) }),
+        client.invalidateQueries({ queryKey: ["meal-suggestion", input.date] }),
+        client.invalidateQueries({ queryKey: ["goals", input.date] }),
+      ]),
+  });
+}
+
+export function useDeleteMealMutation(date: string) {
+  const client = useQueryClient();
+  const queryKey = mealsKey(date);
+  return useMutation({
+    mutationKey: ["food-entry", date, "delete-meal"],
+    mutationFn: (mealId: string) =>
+      api<void>(`/api/meals/${mealId}`, { method: "DELETE" }),
+    onMutate: () => client.cancelQueries({ queryKey }),
+    onSuccess: (_data, mealId) => {
+      client.setQueryData<CachedFoodMeal[]>(queryKey, (meals = []) =>
+        meals.filter((meal) => meal.id !== mealId),
+      );
+    },
+    onSettled: () => {
+      void client.invalidateQueries({ queryKey: ["meal-suggestion", date] });
       if (client.isMutating({ mutationKey: ["food-entry", date] }) === 1) {
         void client.invalidateQueries({ queryKey });
         void client.invalidateQueries({ queryKey: ["goals", date] });

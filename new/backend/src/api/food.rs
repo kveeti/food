@@ -1,4 +1,4 @@
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use topcoat::{
     Result,
     context::{Cx, app_context},
@@ -16,7 +16,10 @@ use crate::{
     auth,
     data::{
         Data,
-        food::{Food, FoodDetail, FoodEntry, FoodMeal, MealChoice, MealSuggestion, NewFoodEntry},
+        food::{
+            CopyMealInput, Food, FoodDetail, FoodEntry, FoodMeal, MealChoice, MealSuggestion,
+            NewFoodEntry,
+        },
     },
 };
 
@@ -45,6 +48,12 @@ struct UpdateInput {
     amount: f64,
 }
 
+#[derive(Serialize)]
+struct CopiedMeal {
+    meal_id: Uuid,
+}
+
+path_param!(meal_id: Uuid, error = bad_request);
 path_param!(food_id: Uuid, error = bad_request);
 path_param!(entry_id: Uuid, error = bad_request);
 
@@ -54,6 +63,8 @@ pub fn register(builder: RouterBuilder) -> RouterBuilder {
         .route(detail)
         .route(meals)
         .route(meal_suggestion)
+        .route(copy)
+        .route(delete_meal)
         .route(add)
         .route(update)
         .route(delete)
@@ -95,6 +106,27 @@ async fn meals(cx: &Cx) -> Result<Json<Vec<FoodMeal>>> {
             .food_meals(user.id, date(&query.date)?, timezone(&user)?.name())
             .await?,
     ))
+}
+
+#[route(POST "/api/meals/{meal_id}/copy")]
+async fn copy(cx: &Cx, Json(input): Json<CopyMealInput>) -> Result<Json<CopiedMeal>> {
+    let user = auth::require_user(cx).await?;
+    let source = path_param::<MealId>(cx)?;
+    let meal_id = app_context::<Data>(cx)
+        .copy_meal(user.id, *source, input, timezone(&user)?.name())
+        .await?
+        .ok_or_else(|| bad_request("check the selected meals, foods, and amounts"))?;
+    Ok(Json(CopiedMeal { meal_id }))
+}
+
+#[route(DELETE "/api/meals/{meal_id}")]
+async fn delete_meal(cx: &Cx) -> Result<()> {
+    let user = auth::require_user(cx).await?;
+    let id = path_param::<MealId>(cx)?;
+    if !app_context::<Data>(cx).delete_meal(user.id, *id).await? {
+        return Err(not_found().into());
+    }
+    Ok(())
 }
 
 #[route(POST "/api/food-entries")]

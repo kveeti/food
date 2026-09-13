@@ -5,15 +5,41 @@ import {
   useIsPresent,
   useReducedMotion,
 } from "framer-motion";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useSearch } from "wouter";
 
-import { type FoodMealView, useFoodMealsQuery } from "../../api/food.ts";
+import {
+  type FoodMealView,
+  useDeleteMealMutation,
+  useFoodMealsQuery,
+} from "../../api/food.ts";
 import { Button } from "../../ui/button/button.tsx";
+import { ChevronRightIcon } from "../../ui/chevron-right-icon.tsx";
 import { useI18n } from "../i18n/use-i18n.tsx";
+import { CopyMealDrawer } from "./copy-meal-drawer.tsx";
+import { DeleteMealDialog } from "./delete-meal-dialog.tsx";
 import { FoodEntryRow } from "./food-entry-row.tsx";
 
 export function FoodSection(props: { date: string }) {
   const meals = useFoodMealsQuery(props.date);
+  const search = useSearch();
+  const requestedMealId = new URLSearchParams(search).get("meal");
+  const viewedMealRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!requestedMealId) {
+      viewedMealRef.current = null;
+      return;
+    }
+    if (meals.isPlaceholderData || viewedMealRef.current === requestedMealId)
+      return;
+    const meal = document.getElementById(`food-meal-${requestedMealId}`);
+    if (meal) {
+      meal.scrollIntoView({ block: "start" });
+      viewedMealRef.current = requestedMealId;
+    }
+  }, [requestedMealId, meals.isPlaceholderData, meals.data]);
+
   const deletingEntryIds = new Set(
     useMutationState({
       filters: {
@@ -23,14 +49,24 @@ export function FoodSection(props: { date: string }) {
       select: (mutation) => mutation.state.variables as string,
     }),
   );
+  const pendingMealIds = new Set(
+    useMutationState({
+      filters: {
+        mutationKey: ["food-entry", props.date, "delete-meal"],
+        status: "pending",
+      },
+      select: (mutation) => mutation.state.variables as string,
+    }),
+  );
   const deletingMealIds = new Set(
     meals.meals
       .filter(
         (meal) =>
-          meal.entries.length > 0 &&
-          meal.entries.every(
-            (entry) => entry.id !== null && deletingEntryIds.has(entry.id),
-          ),
+          (meal.id !== null && pendingMealIds.has(meal.id)) ||
+          (meal.entries.length > 0 &&
+            meal.entries.every(
+              (entry) => entry.id !== null && deletingEntryIds.has(entry.id),
+            )),
       )
       .map((meal) => meal.renderKey),
   );
@@ -189,6 +225,10 @@ function FoodMeal(props: {
   deleting: boolean;
 }) {
   const { f } = useI18n();
+  const [isExpanded, setIsExpanded] = useState(false);
+  const deletion = useDeleteMealMutation(props.date);
+  const isSaved =
+    !!props.meal.id && props.meal.entries.every((entry) => entry.id);
   const reducedMotion = useReducedMotion();
   const present = useIsPresent();
   const energy = props.meal.entries.flatMap((entry) =>
@@ -200,7 +240,8 @@ function FoodMeal(props: {
       aria-hidden={props.deleting || !present || undefined}
       inert={props.deleting || !present}
       layout={reducedMotion ? false : "position"}
-      className="flow-root"
+      id={props.meal.id ? `food-meal-${props.meal.id}` : undefined}
+      className="flow-root sm:scroll-mt-[calc(var(--desktop-day-navigation-height)+var(--desktop-search-height))]"
       initial={{ opacity: 0 }}
       animate={{
         height: props.deleting ? 0 : "auto",
@@ -214,21 +255,57 @@ function FoodMeal(props: {
       aria-labelledby={`meal-${props.id}`}
     >
       <div className={props.first ? undefined : "mt-6"}>
-        <header className="sticky top-0 z-[5] bg-gray-100 sm:top-[calc(var(--desktop-day-navigation-height)+var(--desktop-search-height))] sm:rounded-xl">
-          <div className="flex min-h-12 items-center justify-between gap-4 px-[var(--page-padding)] py-2">
-            <h3 id={`meal-${props.id}`} className="font-medium text-gray-950">
-              {props.meal.name ?? "Meal"}
-            </h3>
-            <p className="shrink-0 text-right text-sm tabular-nums text-gray-600">
-              <time dateTime={props.meal.started_at}>
-                {f.time(new Date(props.meal.started_at))}
-              </time>
-              {" · "}
-              {energy.length
-                ? `${f.calories(energy.reduce((total, nutrient) => total + nutrient.value, 0))} kcal`
-                : "Energy unknown"}
-            </p>
-          </div>
+        <header className="sticky top-0 z-[5] bg-gray-100 sm:top-[calc(var(--desktop-day-navigation-height)+var(--desktop-search-height))] sm:rounded-[calc(var(--radius-xl)+0.5rem)]">
+          <h3
+            aria-labelledby={`meal-${props.id}`}
+            className="rounded-[inherit]"
+          >
+            <button
+              type="button"
+              aria-label={`${isExpanded ? "Close" : "Open"} ${props.meal.name ?? "Meal"} meal`}
+              aria-expanded={isExpanded}
+              aria-controls={`meal-actions-${props.id}`}
+              disabled={!isSaved}
+              onClick={() => {
+                if (isExpanded) deletion.reset();
+                setIsExpanded(!isExpanded);
+              }}
+              className="block w-full rounded-[inherit] text-left font-[inherit] outline-2 outline-transparent outline-offset-[-2px] hover:bg-gray-150 focus-visible:outline-gray-500"
+            >
+              <span className="flex min-h-12 items-center gap-3 py-2 pr-[calc(var(--food-row-inset)+0.375rem)] pl-[var(--page-padding)]">
+                <span
+                  id={`meal-${props.id}`}
+                  className="min-w-0 flex-1 font-medium text-gray-950"
+                >
+                  {props.meal.name ?? "Meal"}
+                </span>
+                <span className="shrink-0 text-right text-sm font-normal tabular-nums text-gray-600">
+                  <time dateTime={props.meal.started_at}>
+                    {f.time(new Date(props.meal.started_at))}
+                  </time>
+                  {" · "}
+                  {energy.length
+                    ? `${f.calories(energy.reduce((total, nutrient) => total + nutrient.value, 0))} kcal`
+                    : "Energy unknown"}
+                </span>
+                <span className="grid size-6 shrink-0 place-items-center text-gray-600">
+                  <ChevronRightIcon
+                    className={`transition-transform duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none ${isExpanded ? "rotate-90" : ""}`}
+                  />
+                </span>
+              </span>
+            </button>
+          </h3>
+          <AnimatePresence initial={false}>
+            {isExpanded && isSaved && (
+              <MealActions
+                id={`meal-actions-${props.id}`}
+                date={props.date}
+                meal={props.meal}
+                deletion={deletion}
+              />
+            )}
+          </AnimatePresence>
         </header>
         <ul aria-label={`${props.meal.name ?? "Meal"} foods`}>
           <AnimatePresence initial={props.animateEntries}>
@@ -244,5 +321,55 @@ function FoodMeal(props: {
         </ul>
       </div>
     </motion.article>
+  );
+}
+
+function MealActions(props: {
+  id: string;
+  date: string;
+  meal: FoodMealView;
+  deletion: ReturnType<typeof useDeleteMealMutation>;
+}) {
+  const isPresent = useIsPresent();
+  const isReducedMotion = useReducedMotion();
+
+  return (
+    <motion.div
+      id={props.id}
+      inert={!isPresent}
+      aria-hidden={!isPresent || undefined}
+      initial={{ height: 0, opacity: 0 }}
+      animate={{ height: "auto", opacity: 1 }}
+      exit={{ height: 0, opacity: 0 }}
+      transition={{
+        height: {
+          duration: isReducedMotion ? 0 : 0.22,
+          ease: [0.16, 1, 0.3, 1],
+        },
+        opacity: { duration: isReducedMotion ? 0 : 0.14, ease: "easeOut" },
+      }}
+      className="overflow-hidden"
+    >
+      <div className="flex flex-wrap items-center justify-between gap-2 p-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <DeleteMealDialog
+            mealName={props.meal.name ?? "Meal"}
+            onConfirm={() => {
+              if (props.deletion.isPending || !props.meal.id) return;
+              props.deletion.mutate(props.meal.id);
+            }}
+          />
+          {props.deletion.isError && (
+            <p
+              role="alert"
+              className="rounded-lg bg-danger-surface text-sm text-danger-fg"
+            >
+              <span className="block px-2 py-1">Error deleting meal</span>
+            </p>
+          )}
+        </div>
+        <CopyMealDrawer meal={props.meal} selectedDate={props.date} />
+      </div>
+    </motion.div>
   );
 }

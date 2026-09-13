@@ -1,5 +1,5 @@
 use anyhow::Result;
-use chrono::{DateTime, NaiveDate, Utc};
+use chrono::{DateTime, NaiveDate, NaiveTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::types::Uuid;
 
@@ -283,6 +283,131 @@ impl Data {
         Ok(Some(entry))
     }
 
+    pub async fn copy_meal(
+        &self,
+        user: Uuid,
+        source: Uuid,
+        input: CopyMealInput,
+        timezone: &str,
+    ) -> Result<Option<Uuid>> {
+        if input.entries.is_empty()
+            || input.entries.iter().any(|entry| {
+                !entry.amount.is_finite() || entry.amount <= 0.0 || entry.amount > 100_000.0
+            })
+        {
+            return Ok(None);
+        }
+        let mut tx = self.pool.begin().await?;
+        sqlx::query("SELECT id FROM users WHERE id = $1 FOR UPDATE")
+            .bind(user)
+            .execute(&mut *tx)
+            .await?;
+        let source_ids: Vec<_> = input.entries.iter().map(|entry| entry.entry_id).collect();
+        let available = sqlx::query_scalar::<_, Uuid>(
+            "SELECT id FROM food_entries
+             WHERE user_id = $1 AND meal_id = $2 AND id = ANY($3) FOR SHARE",
+        )
+        .bind(user)
+        .bind(source)
+        .bind(&source_ids)
+        .fetch_all(&mut *tx)
+        .await?;
+        if available.len() != source_ids.len() {
+            return Ok(None);
+        }
+        let (meal_id, eaten_at) = match input.target {
+            CopyMealTarget::New { meal, time } => {
+                let Some(name) = meal.name() else {
+                    return Ok(None);
+                };
+                sqlx::query_as::<_, (Uuid, DateTime<Utc>)>(
+                    "INSERT INTO meals (id, user_id, name, started_at)
+                     VALUES ($1, $2, $3, (($4::date + $5::time) AT TIME ZONE $6))
+                     RETURNING id, started_at",
+                )
+                .bind(Uuid::now_v7())
+                .bind(user)
+                .bind(name)
+                .bind(input.date)
+                .bind(time)
+                .bind(timezone)
+                .fetch_one(&mut *tx)
+                .await?
+            }
+            CopyMealTarget::Existing { meal_id } => {
+                let target = sqlx::query_as::<_, (Uuid, DateTime<Utc>)>(
+                    "SELECT id, started_at FROM meals
+                     WHERE id = $1 AND user_id = $2
+                       AND (started_at AT TIME ZONE $4)::date = $3
+                       AND EXISTS (SELECT 1 FROM food_entries WHERE meal_id = $1)
+                     FOR SHARE",
+                )
+                .bind(meal_id)
+                .bind(user)
+                .bind(input.date)
+                .bind(timezone)
+                .fetch_optional(&mut *tx)
+                .await?;
+                let Some(target) = target else {
+                    return Ok(None);
+                };
+                target
+            }
+        };
+        let mut new_ids: Vec<_> = input.entries.iter().map(|_| Uuid::now_v7()).collect();
+        new_ids.reverse();
+        let amounts: Vec<_> = input.entries.iter().map(|entry| entry.amount).collect();
+        sqlx::query(
+            "INSERT INTO food_entries (id, user_id, food_id, meal_id, amount, unit, eaten_at,
+                food_name, food_brand, food_source, food_source_id)
+             SELECT copy.id, $1, e.food_id, $2, copy.amount, e.unit, $3,
+                e.food_name, e.food_brand, e.food_source, e.food_source_id
+             FROM unnest($4::uuid[], $5::uuid[], $6::float8[]) AS copy(source_id, id, amount)
+             JOIN food_entries e ON e.id = copy.source_id AND e.user_id = $1",
+        )
+        .bind(user)
+        .bind(meal_id)
+        .bind(eaten_at)
+        .bind(&source_ids)
+        .bind(&new_ids)
+        .bind(&amounts)
+        .execute(&mut *tx)
+        .await?;
+        sqlx::query(
+            "INSERT INTO food_entry_nutrients (food_entry_id, nutrient_id, basis_value)
+             SELECT copy.id, n.nutrient_id, n.basis_value
+             FROM unnest($1::uuid[], $2::uuid[]) AS copy(source_id, id)
+             JOIN food_entry_nutrients n ON n.food_entry_id = copy.source_id",
+        )
+        .bind(&source_ids)
+        .bind(&new_ids)
+        .execute(&mut *tx)
+        .await?;
+        tx.commit().await?;
+        Ok(Some(meal_id))
+    }
+
+    pub async fn delete_meal(&self, user: Uuid, id: Uuid) -> Result<bool> {
+        let mut tx = self.pool.begin().await?;
+        sqlx::query("SELECT id FROM users WHERE id = $1 FOR UPDATE")
+            .bind(user)
+            .execute(&mut *tx)
+            .await?;
+        sqlx::query("DELETE FROM food_entries WHERE meal_id = $1 AND user_id = $2")
+            .bind(id)
+            .bind(user)
+            .execute(&mut *tx)
+            .await?;
+        let deleted = sqlx::query("DELETE FROM meals WHERE id = $1 AND user_id = $2")
+            .bind(id)
+            .bind(user)
+            .execute(&mut *tx)
+            .await?
+            .rows_affected();
+        tx.commit().await?;
+        Ok(deleted > 0)
+    }
+
     pub async fn delete_food_entry(&self, user: Uuid, id: Uuid) -> Result<bool> {
         let mut tx = self.pool.begin().await?;
         sqlx::query("SELECT id FROM users WHERE id = $1 FOR UPDATE")
@@ -348,6 +473,26 @@ pub struct NewFoodEntry<'a> {
     pub unit: &'a str,
     pub date: NaiveDate,
     pub timezone: &'a str,
+}
+
+#[derive(Deserialize)]
+pub struct CopyMealInput {
+    pub date: NaiveDate,
+    pub target: CopyMealTarget,
+    pub entries: Vec<CopyMealEntry>,
+}
+
+#[derive(Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum CopyMealTarget {
+    New { meal: MealChoice, time: NaiveTime },
+    Existing { meal_id: Uuid },
+}
+
+#[derive(Deserialize)]
+pub struct CopyMealEntry {
+    pub entry_id: Uuid,
+    pub amount: f64,
 }
 
 #[derive(Clone, Copy, Deserialize)]

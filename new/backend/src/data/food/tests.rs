@@ -1,6 +1,9 @@
 use super::*;
 use sqlx::PgPool;
 
+mod copying;
+mod deleting;
+
 async fn setup(pool: PgPool) -> Result<(Data, Uuid, Uuid)> {
     sqlx::raw_sql(include_str!("../../../test-support/catalog.sql"))
         .execute(&pool)

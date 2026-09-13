@@ -1,0 +1,73 @@
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100000;
+  background: rgb(0 0 0 / 10%);
+  transition: opacity 150ms;
+}
+
+.viewport {
+  position: fixed;
+  inset: 0;
+  z-index: 100001;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.popup {
+  position: relative;
+  z-index: 0;
+  width: min(24rem, calc(100vw - 2rem));
+  max-height: calc(100dvh - 2rem);
+  overflow-y: auto;
+  padding: 1px;
+  border-radius: var(--radius-2xl);
+  background: color-mix(in oklab, var(--color-gray-500) 15%, transparent);
+  outline: none;
+  transition:
+    scale 150ms,
+    opacity 150ms;
+}
+
+.popup::before {
+  position: absolute;
+  inset: 1px;
+  z-index: -1;
+  border-radius: calc(var(--radius-2xl) - 1px);
+  background: var(--surface-popover);
+  pointer-events: none;
+  content: "";
+}
+
+.popup[data-starting-style],
+.popup[data-ending-style] {
+  scale: 0.98;
+  opacity: 0;
+}
+
+.backdrop[data-starting-style],
+.backdrop[data-ending-style] {
+  opacity: 0;
+}
+
+.cancel:hover:not(:disabled) {
+  background: var(--input-bg-alt-popover);
+}
+
+@media (prefers-color-scheme: dark) {
+  .popup {
+    --color-danger-surface: oklch(32% 0.08 25);
+    --color-danger-surface-hover: oklch(36% 0.09 25);
+    --color-danger-border: oklch(44% 0.1 25);
+
+    background: rgb(255 255 255 / 10%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .backdrop,
+  .popup {
+    transition: none;
+  }
+}

@@ -4,6 +4,7 @@ import { Redirect, Route, Switch, useLocation } from "wouter";
 import { useMeQuery } from "../api/user.ts";
 import { useIsReducedMotion } from "../lib/use-is-reduced-motion.ts";
 import { ImmediateNavLink } from "../ui/immediate-nav-link.tsx";
+import { Toaster } from "../ui/toaster/toaster.tsx";
 import HomePage from "./home/home-page.tsx";
 import { I18n } from "./i18n/i18n.tsx";
 import SettingsPage from "./settings/settings-page.tsx";
@@ -36,6 +37,7 @@ export default function App() {
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden [--nav-clearance:calc(3.75rem_+_env(safe-area-inset-bottom,0px))] sm:[--nav-clearance:calc(4.25rem_+_env(safe-area-inset-bottom,0px))]">
+      <Toaster />
       <AppNav setup={needsSetup} />
       <Switch>
         <Route path="/settings">
