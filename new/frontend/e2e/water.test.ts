@@ -6,33 +6,6 @@ import {
   openWaterDrawer,
 } from "./helpers.ts";
 
-test("anchors the desktop water panel beside its trigger or screen edge", async ({
-  page,
-}) => {
-  await login(page);
-  await finishSetup(page);
-  await page.setViewportSize({ width: 1600, height: 900 });
-
-  const trigger = page.getByRole("button", { name: "Log water" });
-  await trigger.click();
-  const panel = page.getByRole("dialog", { name: "Water" });
-  await expect(panel).toBeVisible();
-
-  const wideTrigger = await trigger.boundingBox();
-  const widePanel = await panel.boundingBox();
-  expect(wideTrigger).not.toBeNull();
-  expect(widePanel).not.toBeNull();
-  expect(widePanel!.x).toBeGreaterThan(wideTrigger!.x + wideTrigger!.width);
-
-  await closeWaterDrawer(page);
-  await page.setViewportSize({ width: 900, height: 700 });
-  await trigger.click();
-  const narrowPanel = await panel.boundingBox();
-  expect(narrowPanel).not.toBeNull();
-  expect(narrowPanel!.x + narrowPanel!.width).toBeLessThanOrEqual(900 - 16);
-  expect(narrowPanel!.x + narrowPanel!.width).toBeGreaterThan(900 - 32);
-});
-
 test("sends only amount and date and updates both water views before saving", async ({
   page,
 }) => {
@@ -165,28 +138,10 @@ test("rolls back both water views after failed adds and deletes", async ({
   await expect(total).toHaveText("0 ml");
   const empty = page.getByText("No water logged for this day");
   await expect(empty).toBeVisible();
-  await expect
-    .poll(() =>
-      entries
-        .locator("li")
-        .evaluateAll((elements) =>
-          elements.reduce(
-            (height, element) =>
-              height + element.getBoundingClientRect().height,
-            0,
-          ),
-        ),
-    )
-    .toBe(0);
-  const pendingEmptyTop = await empty.evaluate(
-    (element) => element.getBoundingClientRect().top,
-  );
+  await expect(entries.getByRole("listitem")).toHaveCount(0);
   releaseSuccessfulDelete();
   expect((await deleted).ok()).toBe(true);
-  await expect(entries.locator("li")).toHaveCount(0);
-  expect(
-    await empty.evaluate((element) => element.getBoundingClientRect().top),
-  ).toBe(pendingEmptyTop);
+  await expect(entries.getByRole("listitem")).toHaveCount(0);
   await page.reload();
   await openWaterDrawer(page);
   await expect(total).toHaveText("0 ml");

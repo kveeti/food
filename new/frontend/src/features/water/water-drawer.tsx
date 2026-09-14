@@ -9,6 +9,7 @@ import {
 } from "./water-drawer-handle.ts";
 import { WaterEntryList } from "./water-entry-list.tsx";
 import { WaterForm } from "./water-form.tsx";
+import { WaterGoal } from "./water-goal.tsx";
 
 export function WaterDrawer(props: { date: string }) {
   const isDesktop = useIsDesktop();
@@ -26,11 +27,12 @@ function MobileWaterDrawer(props: { date: string }) {
       <Drawer.Portal>
         <Drawer.Backdrop className="fixed inset-0 z-[100000] bg-black/10 opacity-[calc(1-var(--drawer-swipe-progress))] transition-opacity duration-[450ms] ease-[cubic-bezier(0.32,0.72,0,1)] data-[ending-style]:opacity-0 data-[ending-style]:[transition-duration:calc(var(--drawer-swipe-strength)*400ms)] data-[starting-style]:opacity-0 data-[swiping]:duration-0 motion-reduce:transition-none" />
         <Drawer.Viewport className="pointer-events-none fixed inset-0 z-[100001] flex justify-end">
-          <Drawer.Popup className="pointer-events-auto h-dvh w-full max-w-md translate-x-[var(--drawer-swipe-movement-x)] overflow-hidden bg-canvas shadow-2xl outline-none transition-transform duration-[450ms] ease-[cubic-bezier(0.32,0.72,0,1)] will-change-transform data-[ending-style]:translate-x-full data-[ending-style]:[transition-duration:calc(var(--drawer-swipe-strength)*400ms)] data-[starting-style]:translate-x-full data-[swiping]:select-none motion-reduce:transition-none">
+          <Drawer.Popup className="pointer-events-auto h-full w-full max-w-md translate-x-[var(--drawer-swipe-movement-x)] overflow-hidden bg-canvas shadow-2xl outline-none transition-transform duration-[450ms] ease-[cubic-bezier(0.32,0.72,0,1)] will-change-transform data-[ending-style]:translate-x-full data-[ending-style]:[transition-duration:calc(var(--drawer-swipe-strength)*400ms)] data-[starting-style]:translate-x-full data-[swiping]:select-none motion-reduce:transition-none">
             <Drawer.Content className="h-full">
               <WaterPanel
+                isMobile
                 date={props.date}
-                paddingClassName="px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))]"
+                paddingClassName="px-4 pt-[max(1rem,env(safe-area-inset-top))]"
                 title={<Drawer.Title className="sr-only">Water</Drawer.Title>}
                 description={
                   <Drawer.Description className="sr-only">
@@ -98,20 +100,22 @@ function DesktopWaterPopover(props: { date: string }) {
 
 function WaterPanel(props: {
   date: string;
+  isMobile?: boolean;
   paddingClassName: string;
   title: ReactNode;
   description: ReactNode;
   close: ReactNode;
 }) {
   return (
-    <div className="h-full overflow-y-auto overscroll-contain">
-      <div className={props.paddingClassName}>
+    <div className="h-full overflow-hidden [container-type:size]">
+      <div className={`flex h-full min-h-0 flex-col ${props.paddingClassName}`}>
         <header className="flex items-center justify-between gap-4">
           {props.title}
           {props.close}
         </header>
         {props.description}
-        <WaterForm date={props.date} />
+        {props.isMobile && <WaterGoal date={props.date} />}
+        <WaterForm date={props.date} isMobile={props.isMobile} />
         <WaterEntryList date={props.date} />
       </div>
     </div>

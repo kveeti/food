@@ -21,7 +21,7 @@ const VESSELS = {
     defaultAmount: 250,
     top: 10,
     bottom: 220,
-    className: "h-[280px] w-[180px]",
+    className: "aspect-[9/14]",
     viewBox: "0 0 140 230",
     path: "M10 10 H130 L115 207 Q114 220 100 220 H40 Q26 220 25 207 Z",
   },
@@ -32,7 +32,7 @@ const VESSELS = {
     defaultAmount: 1000,
     top: 24,
     bottom: 232,
-    className: "h-[310px] w-[190px]",
+    className: "aspect-[43/70]",
     viewBox: "0 0 140 240",
     path: "M58 6 H82 Q88 6 88 12 V18 Q88 22 86 22 Q88 24 92 24 C114 24 132 46 132 72 V204 Q132 230 106 230 H34 Q8 230 8 204 V72 C8 46 26 24 48 24 Q52 24 54 22 Q52 22 52 18 V12 Q52 6 58 6 Z",
   },
@@ -65,7 +65,7 @@ function waterReducer(state: WaterState, action: WaterAction): WaterState {
   };
 }
 
-export function WaterForm(props: { date: string }) {
+export function WaterForm(props: { date: string; isMobile?: boolean }) {
   const addWater = useAddWaterMutation(props.date);
   const [state, dispatch] = useReducer(waterReducer, initialState);
   const amount = state.amounts[state.selected];
@@ -74,7 +74,7 @@ export function WaterForm(props: { date: string }) {
 
   return (
     <form
-      className="mt-6 flex flex-col items-center"
+      className={`mx-auto grid min-h-0 w-full max-w-54 grid-cols-[--spacing(18)_1fr] grid-rows-[minmax(0,1fr)_auto_minmax(--spacing(11),0.3fr)_auto] items-center gap-x-4 gap-y-2 ${props.isMobile ? "mt-[clamp(--spacing(2),5cqh,--spacing(14))]" : "mt-[clamp(--spacing(2),5cqh,--spacing(6))]"}`}
       onSubmit={(event) => {
         event.preventDefault();
         if (!addWater.isPending) {
@@ -85,30 +85,57 @@ export function WaterForm(props: { date: string }) {
         }
       }}
     >
-      <div className="relative h-[420px] w-48">
-        {(Object.keys(VESSELS) as VesselName[]).map((name) => (
-          <WaterVessel
-            key={name}
-            name={name}
-            amount={state.amounts[name]}
-            selected={state.selected === name}
-            onSelect={() => dispatch({ type: "select", vessel: name })}
-            onAmount={(nextAmount) =>
-              dispatch({
-                type: "setAmount",
-                vessel: name,
-                amount: nextAmount,
-              })
-            }
-          />
-        ))}
-      </div>
+      {(Object.keys(VESSELS) as VesselName[]).map((name) => (
+        <WaterVessel
+          key={name}
+          name={name}
+          amount={state.amounts[name]}
+          selected={state.selected === name}
+          onSelect={() => dispatch({ type: "select", vessel: name })}
+          onAmount={(nextAmount) =>
+            dispatch({
+              type: "setAmount",
+              vessel: name,
+              amount: nextAmount,
+            })
+          }
+        />
+      ))}
 
-      <output className="mt-3 text-[2rem] font-semibold tabular-nums text-gray-950">
+      <output className="col-span-2 row-start-2 text-center text-[2rem] font-semibold tabular-nums text-gray-950">
         {f.number(amount)} ml
       </output>
 
-      <div className="mt-5 w-full max-w-xs">
+      <Button
+        type="submit"
+        aria-label="Add water"
+        className="col-start-2 row-start-3 min-h-11 w-full"
+      >
+        {addWater.isPending ? (
+          "Adding…"
+        ) : (
+          <>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              aria-hidden="true"
+              fill="none"
+              viewBox="0 0 24 24"
+              strokeWidth={1.5}
+              stroke="currentColor"
+              className="size-5 shrink-0"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M12 4.5v15m7.5-7.5h-15"
+              />
+            </svg>
+            <span>water</span>
+          </>
+        )}
+      </Button>
+
+      <div className="col-span-2 row-start-4">
         <AnimatePresence initial={false}>
           {addWater.isError && (
             <motion.p
@@ -128,9 +155,6 @@ export function WaterForm(props: { date: string }) {
             </motion.p>
           )}
         </AnimatePresence>
-        <Button type="submit" className="w-full">
-          {addWater.isPending ? "Adding…" : "Add water"}
-        </Button>
       </div>
     </form>
   );
@@ -145,6 +169,7 @@ function WaterVessel(props: {
 }) {
   const { f } = useI18n();
   const vessel = VESSELS[props.name];
+  const reducedMotion = useReducedMotion();
   const setAmount = (value: number) => {
     props.onAmount(
       Math.min(
@@ -173,7 +198,12 @@ function WaterVessel(props: {
       (vessel.bottom - vessel.top);
 
   return (
-    <div
+    <motion.div
+      layout
+      transition={{
+        duration: reducedMotion ? 0 : 0.36,
+        ease: [0.16, 1, 0.3, 1],
+      }}
       role="slider"
       tabIndex={0}
       data-selected={props.selected}
@@ -184,7 +214,11 @@ function WaterVessel(props: {
       aria-valuemax={vessel.max}
       aria-valuenow={props.amount}
       aria-valuetext={`${f.number(props.amount)} millilitres`}
-      className={`water-vessel rounded-2xl outline-2 outline-transparent outline-offset-4 focus-visible:outline-gray-500 ${vessel.className}`}
+      className={`water-vessel max-h-full min-h-0 justify-self-center rounded-2xl outline-2 outline-transparent outline-offset-4 focus-visible:outline-gray-500 ${vessel.className} ${
+        props.selected
+          ? "col-span-2 row-start-1 h-70"
+          : "col-start-1 row-start-3 h-21"
+      }`}
       onClick={props.onSelect}
       onPointerDown={(event) => setFromPointer(event, true)}
       onPointerMove={(event) => setFromPointer(event, false)}
@@ -199,7 +233,7 @@ function WaterVessel(props: {
       }
     >
       <VesselGraphic name={props.name} liquidY={liquidY} />
-    </div>
+    </motion.div>
   );
 }
 

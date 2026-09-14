@@ -8,31 +8,37 @@ export function WaterEntryList(props: { date: string }) {
   const waterEntries = useWaterEntriesQuery(props.date);
 
   return (
-    <div className="mt-4">
-      {waterEntries.isPending ? (
-        <WaterEntriesSkeleton />
-      ) : waterEntries.isError ? (
-        <WaterEntriesError
-          retrying={waterEntries.isFetching}
-          onRetry={() => void waterEntries.refetch()}
-        />
-      ) : (
-        <div
-          aria-busy={waterEntries.isPlaceholderData}
-          inert={waterEntries.isPlaceholderData}
-          className={`transition-[filter,opacity] duration-200 ${waterEntries.isPlaceholderData ? "pointer-events-none opacity-70 blur-[1px]" : ""}`}
-        >
-          <WaterEntries
-            key={`${props.date}:${waterEntries.isPlaceholderData ? "stale" : "current"}`}
-            date={props.date}
-            entries={waterEntries.entries}
-            loading={waterEntries.isPlaceholderData}
+    <div
+      role="region"
+      aria-label="Water history"
+      className="mt-4 min-h-[calc(12rem+max(1rem,env(safe-area-inset-bottom)))] flex-1 overflow-y-auto overscroll-contain"
+    >
+      <div className="pb-[max(1rem,env(safe-area-inset-bottom))]">
+        {waterEntries.isPending ? (
+          <WaterEntriesSkeleton />
+        ) : waterEntries.isError ? (
+          <WaterEntriesError
+            retrying={waterEntries.isFetching}
+            onRetry={() => void waterEntries.refetch()}
           />
-          {waterEntries.entries.every((entry) => entry.isDeleting) && (
-            <WaterEmptyState />
-          )}
-        </div>
-      )}
+        ) : (
+          <div
+            aria-busy={waterEntries.isPlaceholderData}
+            inert={waterEntries.isPlaceholderData}
+            className={`transition-[filter,opacity] duration-200 ${waterEntries.isPlaceholderData ? "pointer-events-none opacity-70 blur-[1px]" : ""}`}
+          >
+            <WaterEntries
+              key={`${props.date}:${waterEntries.isPlaceholderData ? "stale" : "current"}`}
+              date={props.date}
+              entries={waterEntries.entries}
+              loading={waterEntries.isPlaceholderData}
+            />
+            {waterEntries.entries.every((entry) => entry.isDeleting) && (
+              <WaterEmptyState />
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -89,7 +95,7 @@ function WaterEmptyState() {
             No water logged for this day
           </p>
           <p className="mt-0.5 text-sm text-gray-600">
-            Use the controls above to log water
+            Choose an amount to log water
           </p>
         </div>
       </div>
