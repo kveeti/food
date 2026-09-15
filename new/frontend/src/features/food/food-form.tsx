@@ -47,7 +47,7 @@ export function SelectedFood(props: {
 
   if (food.isError) {
     return (
-      <div className="mt-4 rounded-2xl bg-danger-surface">
+      <div className="mt-4 mb-4 rounded-2xl bg-danger-surface">
         <div className="flex flex-wrap items-center justify-between gap-4 p-4">
           <p role="alert" className="font-medium text-danger-fg">
             Error loading food
@@ -71,8 +71,8 @@ export function SelectedFood(props: {
   }
 
   return (
-    <div className="mt-4 rounded-2xl border border-gray-200 p-4">
-      <div className="mb-4 min-h-[2lh]">
+    <div className="mt-4 mb-4 rounded-2xl border border-gray-200 p-4">
+      <div className="mb-4 min-h-lh">
         {food.data ? (
           <h3 className="font-medium text-gray-950">
             {food.data.display_name}
@@ -81,9 +81,6 @@ export function SelectedFood(props: {
           <div aria-hidden="true" className="motion-safe:animate-pulse">
             <div className="flex h-lh items-center">
               <div className="h-5 w-48 max-w-full rounded bg-gray-200" />
-            </div>
-            <div className="flex h-lh items-center">
-              <div className="h-5 w-32 max-w-full rounded bg-gray-200" />
             </div>
           </div>
         )}

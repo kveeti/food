@@ -94,9 +94,6 @@ function WaterEmptyState() {
           <p className="font-medium text-gray-950">
             No water logged for this day
           </p>
-          <p className="mt-0.5 text-sm text-gray-600">
-            Choose an amount to log water
-          </p>
         </div>
       </div>
     </div>

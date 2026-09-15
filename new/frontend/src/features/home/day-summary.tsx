@@ -89,8 +89,8 @@ function NutrientTotals(props: { goals: GoalsWithProgress }) {
         const total = progress.get(nutrient.code);
         if (!total) return null;
         const amount = total.unknown
-          ? "Unknown"
-          : `${total.incomplete ? "At least " : ""}${f.nutrient(total.eaten)}`;
+          ? "--"
+          : `${total.incomplete ? "~" : ""}${f.nutrient(total.eaten)}`;
         return (
           <div
             key={nutrient.code}

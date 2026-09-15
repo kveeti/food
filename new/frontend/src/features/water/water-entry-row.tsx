@@ -49,7 +49,7 @@ export function WaterEntryRow(props: {
           animate={{ opacity: 0 }}
           transition={{
             delay: isReducedMotion ? 0 : 0.6,
-            duration: isReducedMotion ? 0 : 2.4,
+            duration: isReducedMotion ? 0 : 1.2,
             ease: "easeOut",
           }}
         />

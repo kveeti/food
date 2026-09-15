@@ -33,8 +33,8 @@ export function GoalCard(props: {
   } as CSSProperties;
   const unknown = props.valueUnknown && !props.initialLoading;
   const value = unknown
-    ? "Unknown"
-    : `${props.incomplete ? "At least " : ""}${props.tone === "calorie" ? f.calories(props.value) : f.amount(props.value)}`;
+    ? "--"
+    : `${props.incomplete ? "~" : ""}${props.tone === "calorie" ? f.calories(props.value) : f.amount(props.value)}`;
   const text =
     unknown || props.goal === null
       ? value

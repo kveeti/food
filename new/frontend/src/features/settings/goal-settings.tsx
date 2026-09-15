@@ -9,11 +9,12 @@ import {
   useSaveGoalsMutation,
 } from "../../api/goals.ts";
 import { type SaveStatus, useAutosave } from "../../lib/use-autosave.ts";
-import { Button } from "../../ui/button/button.tsx";
 import { DateInput } from "../../ui/input/date-input.tsx";
 import { Field } from "../../ui/input/field.tsx";
 import { Input } from "../../ui/input/input.tsx";
 import { useI18n } from "../i18n/use-i18n.tsx";
+import { GoalSettingsSkeleton } from "./goal-settings-skeleton.tsx";
+import { AddNutrientGoalRow, NutrientGoalRow } from "./nutrient-goals.tsx";
 
 const number = v.pipe(
   v.string(),
@@ -84,7 +85,7 @@ export function GoalSettings(props: {
           onChange={(event) => setStartsOn(event.currentTarget.value)}
         />
       </Field>
-      {goals.isPending && <p className="mt-4 text-gray-600">Loading goals…</p>}
+      {goals.isPending && <GoalSettingsSkeleton />}
       {goals.isError && (
         <p role="alert" className="mt-4 text-danger-fg">
           Error loading goals.
@@ -240,8 +241,8 @@ function GoalForm(props: {
 
       <div>
         <h3 className="mb-3 font-medium text-gray-950">Nutrients</h3>
-        <div className="grid gap-4 sm:grid-cols-2">
-          {shown.map((nutrient) => {
+        <div className="space-y-3">
+          {shown.map((nutrient, rowIndex) => {
             const nutrientIndex = props.goals.nutrients.findIndex(
               (item) => item.code === nutrient.code,
             );
@@ -252,68 +253,50 @@ function GoalForm(props: {
                 path={["nutrients", nutrientIndex, "value"]}
               >
                 {(field) => (
-                  <div className="flex items-end gap-2">
-                    <div className="min-w-0 flex-1">
-                      <Field
-                        label={`${nutrient.name} (${nutrient.unit})`}
-                        error={field.errors?.[0]}
-                      >
-                        <Input
-                          {...field.props}
-                          value={field.input ?? ""}
-                          error={!!field.errors}
-                          inputMode="decimal"
-                          autoComplete="off"
-                        />
-                      </Field>
-                    </div>
-                    {!nutrient.show_by_default && (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => {
-                          setInput(form, {
-                            path: ["nutrients", nutrientIndex, "value"],
-                            input: "",
-                          });
-                          setShownCodes((codes) =>
-                            codes.filter((code) => code !== nutrient.code),
-                          );
-                          autosave.schedule();
-                        }}
-                      >
-                        Remove
-                      </Button>
+                  <NutrientGoalRow
+                    nutrient={nutrient}
+                    options={props.goals.nutrients.filter(
+                      (item) =>
+                        item.code === nutrient.code ||
+                        !shownCodes.includes(item.code),
                     )}
-                  </div>
+                    input={field.input ?? ""}
+                    inputProps={field.props}
+                    error={field.errors?.[0]}
+                    onNutrientChange={(code) => {
+                      if (!code || code === nutrient.code) return;
+                      const nextIndex = props.goals.nutrients.findIndex(
+                        (item) => item.code === code,
+                      );
+                      setInput(form, {
+                        path: ["nutrients", nutrientIndex, "value"],
+                        input: "",
+                      });
+                      setInput(form, {
+                        path: ["nutrients", nextIndex, "value"],
+                        input: "",
+                      });
+                      setShownCodes((codes) =>
+                        codes.map((shownCode, index) =>
+                          index === rowIndex ? code : shownCode,
+                        ),
+                      );
+                      autosave.schedule();
+                    }}
+                  />
                 )}
               </FormField>
             );
           })}
         </div>
         {available.length > 0 && (
-          <label className="mt-4 flex flex-col gap-1.5">
-            <span className="text-sm text-gray-700">Add nutrient goal</span>
-            <select
-              value=""
-              onChange={(event) => {
-                if (event.currentTarget.value) {
-                  setShownCodes((codes) => [
-                    ...codes,
-                    event.currentTarget.value,
-                  ]);
-                }
-              }}
-              className="h-10 min-w-0 max-w-full w-full rounded-xl border border-transparent bg-[var(--input-bg)] px-3 font-[inherit] text-gray-1000 outline-2 outline-transparent outline-offset-[-1px] hover:bg-[var(--input-bg-alt)] focus-visible:outline-[var(--input-ring-active)]"
-            >
-              <option value="">Choose a nutrient</option>
-              {available.map((nutrient) => (
-                <option key={nutrient.code} value={nutrient.code}>
-                  {nutrient.name}
-                </option>
-              ))}
-            </select>
-          </label>
+          <AddNutrientGoalRow
+            nutrients={available}
+            onSelect={(code) => {
+              if (!code) return;
+              setShownCodes((codes) => [...codes, code]);
+            }}
+          />
         )}
       </div>
 
