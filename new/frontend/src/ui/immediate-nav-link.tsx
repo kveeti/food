@@ -4,6 +4,7 @@ import { Link, useLocation } from "wouter";
 export function ImmediateNavLink(props: {
   href: string;
   className?: string;
+  onPreload?: () => void;
   "aria-label"?: string;
   "aria-current"?: "page";
   children: ReactNode;
@@ -30,6 +31,8 @@ export function ImmediateNavLink(props: {
       className={props.className}
       aria-label={props["aria-label"]}
       aria-current={props["aria-current"]}
+      onPointerEnter={props.onPreload}
+      onFocus={props.onPreload}
       onClick={(event) => {
         if (event.button === 0 && isPlain(event)) event.preventDefault();
       }}

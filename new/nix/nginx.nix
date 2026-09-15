@@ -122,6 +122,7 @@ in
               "/api/" = proxy;
               "/auth/" = proxy;
               "= /logout" = proxy;
+              "= /sign-in".tryFiles = "/sign-in/index.html =404";
 
               "/assets/".extraConfig = ''
                 expires 1y;

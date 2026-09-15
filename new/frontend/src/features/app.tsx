@@ -1,21 +1,35 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { motion } from "framer-motion";
+import { Suspense } from "react";
 import { Redirect, Route, Switch, useLocation } from "wouter";
 
 import { useMeQuery } from "../api/user.ts";
 import { useIsReducedMotion } from "../lib/use-is-reduced-motion.ts";
 import { ImmediateNavLink } from "../ui/immediate-nav-link.tsx";
 import { Toaster } from "../ui/toaster/toaster.tsx";
-import HomePage from "./home/home-page.tsx";
 import { I18n } from "./i18n/i18n.tsx";
-import SettingsPage from "./settings/settings-page.tsx";
+import { loadHomePage, loadLogPage, loadSettingsPage } from "./page-loaders.ts";
+import { HomePage, LogPage, PreloadPages, SettingsPage } from "./pages.tsx";
 
 const navItems = [
-  { href: "/", label: "Today" },
-  { href: "/log", label: "Log" },
-  { href: "/settings", label: "You" },
+  { href: "/", label: "Today", load: loadHomePage },
+  { href: "/log", label: "Log", load: loadLogPage },
+  { href: "/settings", label: "You", load: loadSettingsPage },
 ];
 
+const queryClient = new QueryClient();
+
 export default function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <AppContent />
+      <ReactQueryDevtools />
+    </QueryClientProvider>
+  );
+}
+
+function AppContent() {
   const me = useMeQuery();
   const [location] = useLocation();
 
@@ -39,22 +53,25 @@ export default function App() {
     <div className="flex h-full min-h-0 flex-col overflow-hidden [--nav-clearance:calc(3.75rem_+_env(safe-area-inset-bottom,0px))] sm:[--nav-clearance:calc(4.25rem_+_env(safe-area-inset-bottom,0px))]">
       <Toaster />
       <AppNav setup={needsSetup} />
-      <Switch>
-        <Route path="/settings">
-          <SettingsPage user={me.data} />
-        </Route>
-        <Route path="/log">
-          <LogPage />
-        </Route>
-        <Route path="/">
-          <I18n locale={me.data.locale!} timeZone={me.data.timezone!}>
-            <HomePage />
-          </I18n>
-        </Route>
-        <Route>
-          <Redirect to="/" />
-        </Route>
-      </Switch>
+      <Suspense fallback={null}>
+        <Switch>
+          <Route path="/settings">
+            <SettingsPage user={me.data} />
+          </Route>
+          <Route path="/log">
+            <LogPage />
+          </Route>
+          <Route path="/">
+            <I18n locale={me.data.locale!} timeZone={me.data.timezone!}>
+              <HomePage />
+            </I18n>
+          </Route>
+          <Route>
+            <Redirect to="/" />
+          </Route>
+        </Switch>
+        <PreloadPages />
+      </Suspense>
     </div>
   );
 }
@@ -91,6 +108,9 @@ function AppNav(props: { setup: boolean }) {
               <ImmediateNavLink
                 key={item.href}
                 href={item.href}
+                onPreload={() => {
+                  void item.load().catch(() => {});
+                }}
                 aria-current={selected ? "page" : undefined}
                 className="relative flex flex-1 items-center justify-center rounded-full text-sm font-medium outline-2 outline-transparent [-webkit-tap-highlight-color:transparent] focus-visible:outline-gray-500"
               >
@@ -101,17 +121,5 @@ function AppNav(props: { setup: boolean }) {
         </div>
       </div>
     </nav>
-  );
-}
-
-function LogPage() {
-  return (
-    <main className="min-h-0 w-full flex-1 overflow-y-auto overscroll-contain sm:[scrollbar-gutter:stable_both-edges]">
-      <div className="mx-auto w-full max-w-[var(--page-max-width)] px-[var(--page-padding)] pt-[max(0.75rem,env(safe-area-inset-top,0px))] pb-[calc(var(--nav-clearance)+2.5rem)]">
-        <h1 className="text-xl font-semibold tracking-tight text-gray-950">
-          Log
-        </h1>
-      </div>
-    </main>
   );
 }

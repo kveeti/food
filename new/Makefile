@@ -13,7 +13,7 @@ BACKEND_URL = http://127.0.0.1:$(BACKEND_PORT)
 LOCAL_APP_URL = http://$(DEV_HOST):$(FRONTEND_PORT)
 LOCAL_OIDC_ISSUER = http://$(DEV_HOST):$(IDP_PORT)
 
-.PHONY: frontend backend dev-idp dev devi build check e2e fmt
+.PHONY: frontend backend dev-idp dev devi preview previewi preview-frontend preview-backend preview-idp build build-frontend build-backend check e2e fmt
 MAKEFLAGS += -j
 
 frontend/node_modules/.modules.yaml: frontend/package.json frontend/pnpm-lock.yaml
@@ -30,17 +30,34 @@ dev-idp:
 
 dev: frontend backend
 
-devi: export APP_URL=$(LOCAL_APP_URL)
-devi: export OIDC_ISSUER=$(LOCAL_OIDC_ISSUER)
-devi: export OIDC_CLIENT_ID=$(DEV_OIDC_CLIENT_ID)
-devi: export OIDC_CLIENT_SECRET=$(DEV_OIDC_CLIENT_SECRET)
-devi: export SESSION_ENCRYPTION_KEY=$(DEV_SESSION_ENCRYPTION_KEY)
-devi: export ALLOW_INSECURE_OIDC=1
+devi previewi: export APP_URL=$(LOCAL_APP_URL)
+devi previewi: export OIDC_ISSUER=$(LOCAL_OIDC_ISSUER)
+devi previewi: export OIDC_CLIENT_ID=$(DEV_OIDC_CLIENT_ID)
+devi previewi: export OIDC_CLIENT_SECRET=$(DEV_OIDC_CLIENT_SECRET)
+devi previewi: export SESSION_ENCRYPTION_KEY=$(DEV_SESSION_ENCRYPTION_KEY)
+devi previewi: export ALLOW_INSECURE_OIDC=1
 devi: frontend backend dev-idp
 
-build: frontend/node_modules/.modules.yaml
+preview: preview-frontend preview-backend
+
+previewi: preview-frontend preview-backend preview-idp
+
+preview-frontend: build
+	@cd frontend && VITE_HOST="$(DEV_HOST)" BACKEND_URL="$(BACKEND_URL)" pnpm run preview --port "$(FRONTEND_PORT)"
+
+preview-backend: build
+	@PORT="$(BACKEND_PORT)" cargo run --release --manifest-path backend/Cargo.toml --bin food-backend
+
+preview-idp: build
+	@HOST="$(DEV_HOST)" PORT="$(IDP_PORT)" cargo run --release --manifest-path backend/Cargo.toml --bin dev_idp
+
+build: build-frontend build-backend
+
+build-frontend: frontend/node_modules/.modules.yaml
 	@cd frontend && pnpm run build
-	@cargo build --manifest-path backend/Cargo.toml --bins
+
+build-backend:
+	@cargo build --release --manifest-path backend/Cargo.toml --bins
 
 check: frontend/node_modules/.modules.yaml
 	@cargo fmt --manifest-path backend/Cargo.toml --check

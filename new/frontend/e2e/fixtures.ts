@@ -72,7 +72,12 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
       );
       const vite = startProcess(
         "pnpm",
-        ["run", "dev"],
+        [
+          "run",
+          process.env.E2E_PREVIEW === "1" ? "preview" : "dev",
+          "--port",
+          String(appPort),
+        ],
         frontend,
         join(directory, "vite.log"),
         {

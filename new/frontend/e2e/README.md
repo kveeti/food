@@ -32,3 +32,14 @@ Run `pnpm run e2e` from `frontend` in the Nix development shell, or `make e2e`
 from `new`. The harness builds the backend with the `test-support` feature;
 the seed command is excluded from normal builds and only accepts disposable
 E2E databases. Run one file with `pnpm run e2e food.test.ts`.
+
+Use `pnpm run e2e:preview` to build the frontend and run the same tests against
+Vite preview instead of the dev server. Run the sign-in production checks with:
+
+```sh
+pnpm run e2e:preview prerender.test.ts
+```
+
+These checks cover sign-in without JavaScript, hydration, login/logout, and
+connection-aware preloading. They also check that the browser never requests
+the build-only renderer. The normal dev test run skips these checks.
