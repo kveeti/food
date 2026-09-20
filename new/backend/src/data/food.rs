@@ -54,6 +54,7 @@ struct MealEntryRow {
 }
 
 impl Data {
+    #[tracing::instrument(name = "data::meal_suggestion", level = "info", skip_all)]
     pub async fn meal_suggestion(
         &self,
         user: Uuid,
@@ -100,6 +101,7 @@ impl Data {
         })
     }
 
+    #[tracing::instrument(name = "data::search_foods", level = "info", skip_all)]
     pub async fn search_foods(&self, user: Uuid, query: &str) -> Result<Vec<Food>> {
         Ok(sqlx::query_as(
             "WITH q AS (
@@ -126,6 +128,7 @@ impl Data {
         .await?)
     }
 
+    #[tracing::instrument(name = "data::food", level = "info", skip_all)]
     pub async fn food(&self, user: Uuid, id: Uuid) -> Result<Option<FoodDetail>> {
         let mut tx = self.pool.begin().await?;
         let food = sqlx::query_as::<_, Food>(
@@ -153,6 +156,7 @@ impl Data {
         Ok(Some(FoodDetail { food, nutrients }))
     }
 
+    #[tracing::instrument(name = "data::food_meals", level = "info", skip_all)]
     pub async fn food_meals(
         &self,
         user: Uuid,
@@ -194,6 +198,7 @@ impl Data {
         Ok(meals)
     }
 
+    #[tracing::instrument(name = "data::add_food", level = "info", skip_all)]
     pub async fn add_food(&self, user: Uuid, input: NewFoodEntry<'_>) -> Result<Option<FoodEntry>> {
         let mut tx = self.pool.begin().await?;
         let entry_id = Uuid::now_v7();
@@ -283,6 +288,7 @@ impl Data {
         Ok(Some(entry))
     }
 
+    #[tracing::instrument(name = "data::copy_meal", level = "info", skip_all)]
     pub async fn copy_meal(
         &self,
         user: Uuid,
@@ -387,6 +393,7 @@ impl Data {
         Ok(Some(meal_id))
     }
 
+    #[tracing::instrument(name = "data::delete_meal", level = "info", skip_all)]
     pub async fn delete_meal(&self, user: Uuid, id: Uuid) -> Result<bool> {
         let mut tx = self.pool.begin().await?;
         sqlx::query("SELECT id FROM users WHERE id = $1 FOR UPDATE")
@@ -408,6 +415,7 @@ impl Data {
         Ok(deleted > 0)
     }
 
+    #[tracing::instrument(name = "data::delete_food_entry", level = "info", skip_all)]
     pub async fn delete_food_entry(&self, user: Uuid, id: Uuid) -> Result<bool> {
         let mut tx = self.pool.begin().await?;
         sqlx::query("SELECT id FROM users WHERE id = $1 FOR UPDATE")
@@ -435,6 +443,7 @@ impl Data {
         Ok(meal.is_some())
     }
 
+    #[tracing::instrument(name = "data::update_food_entry", level = "info", skip_all)]
     pub async fn update_food_entry(
         &self,
         user: Uuid,

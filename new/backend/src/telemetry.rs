@@ -3,7 +3,8 @@ use std::{env, time::Duration};
 use anyhow::{Result, anyhow};
 use opentelemetry::{KeyValue, global, trace::TracerProvider as _};
 use opentelemetry_otlp::{
-    WithExportConfig as _, WithTonicConfig as _, tonic_types::metadata::MetadataMap,
+    WithExportConfig as _, WithTonicConfig as _,
+    tonic_types::{metadata::MetadataMap, transport::ClientTlsConfig},
 };
 use opentelemetry_sdk::{
     Resource,
@@ -53,12 +54,16 @@ impl Telemetry {
             }
         }
 
-        let exporter = opentelemetry_otlp::SpanExporter::builder()
+        let is_https = endpoint.starts_with("https://");
+        let mut exporter = opentelemetry_otlp::SpanExporter::builder()
             .with_tonic()
             .with_endpoint(endpoint)
             .with_metadata(metadata)
-            .with_timeout(Duration::from_secs(5))
-            .build()?;
+            .with_timeout(Duration::from_secs(5));
+        if is_https {
+            exporter = exporter.with_tls_config(ClientTlsConfig::new().with_webpki_roots());
+        }
+        let exporter = exporter.build()?;
         let service_name = env::var("OTEL_SERVICE_NAME")
             .ok()
             .filter(|name| !name.is_empty())

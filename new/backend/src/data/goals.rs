@@ -54,6 +54,7 @@ pub struct NewNutrientGoal {
 }
 
 impl Data {
+    #[tracing::instrument(name = "data::nutrient_definitions", level = "info", skip_all)]
     pub async fn nutrient_definitions(&self) -> Result<Vec<NutrientDefinition>> {
         Ok(sqlx::query_as(
             "SELECT id, code, display_name AS name, display_unit AS unit,
@@ -66,6 +67,7 @@ impl Data {
         .await?)
     }
 
+    #[tracing::instrument(name = "data::visible_nutrient_definitions", level = "info", skip_all)]
     pub async fn visible_nutrient_definitions(
         &self,
         user_id: Uuid,
@@ -96,6 +98,7 @@ impl Data {
         .await?)
     }
 
+    #[tracing::instrument(name = "data::goal_profile", level = "info", skip_all)]
     pub async fn goal_profile(
         &self,
         user_id: Uuid,
@@ -132,6 +135,7 @@ impl Data {
         Ok(Some((profile, goals)))
     }
 
+    #[tracing::instrument(name = "data::visible_nutrient_totals", level = "info", skip_all)]
     pub async fn visible_nutrient_totals(
         &self,
         user_id: Uuid,
@@ -183,6 +187,7 @@ impl Data {
         .await?)
     }
 
+    #[tracing::instrument(name = "data::save_goal_profile", level = "info", skip_all)]
     pub async fn save_goal_profile(&self, profile: NewGoalProfile<'_>) -> Result<()> {
         let mut transaction = self.pool.begin().await?;
         let profile_id = sqlx::query_scalar::<_, Uuid>(

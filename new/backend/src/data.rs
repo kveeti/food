@@ -84,13 +84,13 @@ impl Data {
         sqlx::migrate!().run(&self.pool).await
     }
 
-    #[tracing::instrument(name = "data::ping", level = "debug", skip_all)]
+    #[tracing::instrument(name = "data::ping", level = "info", skip_all)]
     pub async fn ping(&self) -> Result<()> {
         sqlx::query("SELECT 1").execute(&self.pool).await?;
         Ok(())
     }
 
-    #[tracing::instrument(name = "data::create_session", level = "debug", skip_all)]
+    #[tracing::instrument(name = "data::create_session", level = "info", skip_all)]
     pub async fn create_session(&self, session: NewSession<'_>) -> Result<()> {
         let mut transaction = self.pool.begin().await?;
         let user_id = sqlx::query_scalar::<_, Uuid>(
@@ -124,7 +124,7 @@ impl Data {
         Ok(())
     }
 
-    #[tracing::instrument(name = "data::session", level = "debug", skip_all)]
+    #[tracing::instrument(name = "data::session", level = "info", skip_all)]
     pub async fn session(&self, token_hash: &[u8]) -> Result<Option<Session>> {
         Ok(sqlx::query_as::<_, Session>(SESSION_QUERY)
             .bind(token_hash)
@@ -148,7 +148,7 @@ impl Data {
         }
     }
 
-    #[tracing::instrument(name = "data::delete_session", level = "debug", skip_all)]
+    #[tracing::instrument(name = "data::delete_session", level = "info", skip_all)]
     pub async fn delete_session(&self, token_hash: &[u8]) -> Result<()> {
         sqlx::query("DELETE FROM sessions WHERE token_hash = $1")
             .bind(token_hash)
@@ -157,7 +157,7 @@ impl Data {
         Ok(())
     }
 
-    #[tracing::instrument(name = "data::delete_oidc_session", level = "debug", skip_all)]
+    #[tracing::instrument(name = "data::delete_oidc_session", level = "info", skip_all)]
     pub async fn delete_oidc_session(&self, issuer: &str, session_id: &str) -> Result<()> {
         sqlx::query(
             "DELETE FROM sessions
@@ -207,7 +207,7 @@ impl Data {
         Ok(())
     }
 
-    #[tracing::instrument(name = "data::save_user_settings", level = "debug", skip_all)]
+    #[tracing::instrument(name = "data::save_user_settings", level = "info", skip_all)]
     pub async fn save_user_settings(
         &self,
         user_id: Uuid,
@@ -227,7 +227,7 @@ impl Data {
         Ok(())
     }
 
-    #[tracing::instrument(name = "data::water_entries", level = "debug", skip_all)]
+    #[tracing::instrument(name = "data::water_entries", level = "info", skip_all)]
     pub async fn water_entries(
         &self,
         user_id: Uuid,
@@ -249,7 +249,7 @@ impl Data {
         .await?)
     }
 
-    #[tracing::instrument(name = "data::water_total", level = "debug", skip_all)]
+    #[tracing::instrument(name = "data::water_total", level = "info", skip_all)]
     pub async fn water_total(&self, user_id: Uuid, date: NaiveDate, timezone: &str) -> Result<i64> {
         Ok(sqlx::query_scalar(
             "SELECT coalesce(sum(amount_ml), 0)::bigint
@@ -265,7 +265,7 @@ impl Data {
         .await?)
     }
 
-    #[tracing::instrument(name = "data::add_water", level = "debug", skip_all)]
+    #[tracing::instrument(name = "data::add_water", level = "info", skip_all)]
     pub async fn add_water(
         &self,
         user_id: Uuid,
@@ -292,7 +292,7 @@ impl Data {
         .await?)
     }
 
-    #[tracing::instrument(name = "data::delete_water", level = "debug", skip_all)]
+    #[tracing::instrument(name = "data::delete_water", level = "info", skip_all)]
     pub async fn delete_water(&self, user_id: Uuid, entry_id: Uuid) -> Result<bool> {
         let result = sqlx::query("DELETE FROM water_entries WHERE id = $1 AND user_id = $2")
             .bind(entry_id)
@@ -315,7 +315,7 @@ impl SessionLock {
 impl SessionUpdate<'_> {
     #[tracing::instrument(
         name = "session_update::run",
-        level = "debug",
+        level = "info",
         skip_all,
         fields(lock = self.lock.name())
     )]
