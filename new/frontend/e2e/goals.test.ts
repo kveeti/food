@@ -73,6 +73,10 @@ test("keeps settings controls within the mobile page", async ({ page }) => {
   const date = await page.getByLabel("Start date").boundingBox();
   expect(locale).not.toBeNull();
   expect(date).not.toBeNull();
+  await expect(
+    page.getByRole("heading", { name: "Settings", exact: true }),
+  ).toBeVisible();
+  expect(date!.y).toBeLessThan(locale!.y);
   expect(date!.width).toBeLessThanOrEqual(locale!.width);
   expect(
     await page.locator("#root").evaluate((root) => root.scrollWidth),

@@ -11,6 +11,7 @@ import { Button } from "../../ui/button/button.tsx";
 import { Field } from "../../ui/input/field.tsx";
 import { Input } from "../../ui/input/input.tsx";
 import { I18n } from "../i18n/i18n.tsx";
+import { WeightSection } from "../weight/weight-section.tsx";
 import { GoalSettings } from "./goal-settings.tsx";
 
 const schema = v.object({
@@ -76,89 +77,105 @@ export default function SettingsPage(props: { user: User }) {
         data-settings-scroll
       >
         <div className="mx-auto w-full max-w-[var(--page-max-width)] px-[var(--page-padding)] pt-8 pb-[calc(var(--nav-clearance)+2.5rem)]">
-          <Form
-            of={form}
-            className="flex min-w-0 flex-col gap-5"
-            onChange={() => {
-              if (!needsSetup) autosave.schedule();
-            }}
-            onBlur={(event) => {
-              if (
-                !needsSetup &&
-                !event.currentTarget.contains(event.relatedTarget)
-              ) {
-                autosave.flush();
-              }
-            }}
-            onSubmit={async (settings) => {
-              if (!needsSetup) {
-                autosave.flush();
-                return;
-              }
-              if (mutation.isPending) return;
-              setProfileSaveStatus("saving");
-              try {
-                await mutation.mutateAsync(settings);
-                setProfileSaveStatus("saved");
-                navigate("/");
-              } catch {
-                setProfileSaveStatus("error");
-              }
-            }}
-          >
-            <FormField of={form} path={["locale"]}>
-              {(field) => (
-                <Field label="Locale" error={field.errors?.[0]}>
-                  <Input
-                    {...field.props}
-                    error={!!field.errors}
-                    value={field.input ?? ""}
-                    placeholder="en-FI"
-                    autoComplete="language"
-                  />
-                </Field>
-              )}
-            </FormField>
-
-            <FormField of={form} path={["timezone"]}>
-              {(field) => (
-                <Field label="Timezone" error={field.errors?.[0]}>
-                  <Input
-                    {...field.props}
-                    error={!!field.errors}
-                    value={field.input ?? ""}
-                    placeholder="Europe/Helsinki"
-                    autoComplete="off"
-                    list="timezones"
-                  />
-                  <datalist id="timezones">
-                    {timezones.map((timezone) => (
-                      <option key={timezone} value={timezone} />
-                    ))}
-                  </datalist>
-                </Field>
-              )}
-            </FormField>
-
-            {mutation.isError && (
-              <p role="alert" className="text-base text-danger-fg">
-                Error saving settings
-              </p>
-            )}
-
-            {needsSetup && (
-              <div className="mt-2 flex justify-end">
-                <Button type="submit">
-                  {mutation.isPending ? "Saving…" : "Save"}
-                </Button>
-              </div>
-            )}
-          </Form>
+          {!needsSetup && (
+            <I18n locale={props.user.locale!} timeZone={props.user.timezone!}>
+              <WeightSection />
+            </I18n>
+          )}
           {!needsSetup && (
             <I18n locale={props.user.locale!} timeZone={props.user.timezone!}>
               <GoalSettings onSaveStatusChange={setGoalSaveStatus} />
             </I18n>
           )}
+          <section
+            aria-labelledby="settings-heading"
+            className={needsSetup ? undefined : "mt-12"}
+          >
+            <h2
+              id="settings-heading"
+              className="mb-5 text-lg font-medium text-gray-950"
+            >
+              Settings
+            </h2>
+            <Form
+              of={form}
+              className="flex min-w-0 flex-col gap-5"
+              onChange={() => {
+                if (!needsSetup) autosave.schedule();
+              }}
+              onBlur={(event) => {
+                if (
+                  !needsSetup &&
+                  !event.currentTarget.contains(event.relatedTarget)
+                ) {
+                  autosave.flush();
+                }
+              }}
+              onSubmit={async (settings) => {
+                if (!needsSetup) {
+                  autosave.flush();
+                  return;
+                }
+                if (mutation.isPending) return;
+                setProfileSaveStatus("saving");
+                try {
+                  await mutation.mutateAsync(settings);
+                  setProfileSaveStatus("saved");
+                  navigate("/");
+                } catch {
+                  setProfileSaveStatus("error");
+                }
+              }}
+            >
+              <FormField of={form} path={["locale"]}>
+                {(field) => (
+                  <Field label="Locale" error={field.errors?.[0]}>
+                    <Input
+                      {...field.props}
+                      error={!!field.errors}
+                      value={field.input ?? ""}
+                      placeholder="en-FI"
+                      autoComplete="language"
+                    />
+                  </Field>
+                )}
+              </FormField>
+
+              <FormField of={form} path={["timezone"]}>
+                {(field) => (
+                  <Field label="Timezone" error={field.errors?.[0]}>
+                    <Input
+                      {...field.props}
+                      error={!!field.errors}
+                      value={field.input ?? ""}
+                      placeholder="Europe/Helsinki"
+                      autoComplete="off"
+                      list="timezones"
+                    />
+                    <datalist id="timezones">
+                      {timezones.map((timezone) => (
+                        <option key={timezone} value={timezone} />
+                      ))}
+                    </datalist>
+                  </Field>
+                )}
+              </FormField>
+
+              {mutation.isError && (
+                <p role="alert" className="text-base text-danger-fg">
+                  Error saving settings
+                </p>
+              )}
+
+              {needsSetup && (
+                <div className="mt-2 flex justify-end">
+                  <Button type="submit">
+                    {mutation.isPending ? "Saving…" : "Save"}
+                  </Button>
+                </div>
+              )}
+            </Form>
+          </section>
           <form method="post" action="/logout" className="mt-10">
             <Button type="submit" variant="outline">
               Log out

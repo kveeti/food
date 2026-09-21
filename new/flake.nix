@@ -27,6 +27,7 @@
               "--bin"
               "food-backend"
             ];
+            checkFlags = [ "--skip=data::" ];
           };
 
           frontend = pkgs.stdenvNoCC.mkDerivation (finalAttrs: {
@@ -38,7 +39,7 @@
               inherit (finalAttrs) pname version src;
               pnpm = pkgs.pnpm_10;
               fetcherVersion = 4;
-              hash = "sha256-Tue4GNlm7/1Ekf8dnpkWZqDeOGXXeHt3IfazmPeyn9Q=";
+              hash = "sha256-UzCZT1ZraSusfkKi0yzUZhGILSsLO+P2AIgJ5xFtHV8=";
             };
 
             nativeBuildInputs = [

@@ -2,6 +2,7 @@ mod food;
 mod goals;
 mod settings;
 mod water;
+mod weight;
 
 use serde::Serialize;
 use topcoat::{
@@ -29,6 +30,7 @@ pub fn register(builder: RouterBuilder) -> RouterBuilder {
     let builder = builder.route(health).route(me);
     let builder = settings::register(builder);
     let builder = goals::register(builder);
+    let builder = weight::register(builder);
     food::register(water::register(builder))
 }
 

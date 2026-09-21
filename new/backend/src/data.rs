@@ -6,6 +6,7 @@ use sqlx::{PgPool, migrate::MigrateError, types::Uuid};
 
 pub mod food;
 pub mod goals;
+pub mod weight;
 
 #[derive(Clone)]
 pub struct Data {
