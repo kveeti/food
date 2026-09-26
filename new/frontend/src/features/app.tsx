@@ -59,7 +59,9 @@ function AppContent() {
             <SettingsPage user={me.data} />
           </Route>
           <Route path="/log">
-            <LogPage />
+            <I18n locale={me.data.locale!} timeZone={me.data.timezone!}>
+              <LogPage />
+            </I18n>
           </Route>
           <Route path="/">
             <I18n locale={me.data.locale!} timeZone={me.data.timezone!}>

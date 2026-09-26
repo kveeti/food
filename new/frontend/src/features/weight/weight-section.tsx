@@ -19,13 +19,14 @@ import { WeightForm } from "./weight-form.tsx";
 export function WeightSection() {
   const { f, timeZone } = useI18n();
   const query = useWeightEntriesQuery();
+  const entries = query.data ?? [];
   const mutation = useWeightMutation();
   const inputRef = useRef<HTMLInputElement>(null);
   const [entry, setEntry] = useState<WeightEntry | null>(null);
   const [formKey, setFormKey] = useState(0);
   const [isHistoryRequestedOpen, setIsHistoryRequestedOpen] = useState(false);
-  const latest = query.entries[0];
-  const isHistoryOpen = isHistoryRequestedOpen && query.entries.length > 0;
+  const latest = entries[0];
+  const isHistoryOpen = isHistoryRequestedOpen && entries.length > 0;
 
   function resetForm() {
     setEntry(null);
@@ -84,7 +85,7 @@ export function WeightSection() {
               aria-label={`${isHistoryOpen ? "Close" : "Open"} weight history`}
               aria-expanded={isHistoryOpen}
               aria-controls="weight-history"
-              disabled={query.entries.length === 0}
+              disabled={entries.length === 0}
               onClick={() => setIsHistoryRequestedOpen(!isHistoryOpen)}
               className="block w-full rounded-[inherit] text-left font-[inherit] outline-2 outline-transparent outline-offset-[-2px] hover:not-disabled:bg-gray-150 focus-visible:outline-gray-500 disabled:cursor-default disabled:opacity-60"
             >
@@ -101,9 +102,9 @@ export function WeightSection() {
             </button>
           </h3>
           <AnimatePresence initial={false}>
-            {isHistoryOpen && query.entries.length > 0 && (
+            {isHistoryOpen && entries.length > 0 && (
               <WeightHistory
-                entries={query.entries.slice(0, 10)}
+                entries={entries}
                 isPending={mutation.isPending}
                 onSelect={(historyEntry) => {
                   mutation.reset();

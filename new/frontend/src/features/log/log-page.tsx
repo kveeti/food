@@ -1,3 +1,5 @@
+import { WeightChart } from "../weight/weight-chart.tsx";
+
 export default function LogPage() {
   return (
     <main className="min-h-0 w-full flex-1 overflow-y-auto overscroll-contain sm:[scrollbar-gutter:stable_both-edges]">
@@ -5,6 +7,9 @@ export default function LogPage() {
         <h1 className="text-xl font-semibold tracking-tight text-gray-950">
           Log
         </h1>
+        <div className="mt-8">
+          <WeightChart />
+        </div>
       </div>
     </main>
   );
