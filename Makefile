@@ -5,52 +5,70 @@ endif
 
 include dev-idp.env
 
-PORT ?= 8000
-IDP_PORT ?= $(shell expr $(PORT) + 1)
-LOCAL_APP_URL = http://127.0.0.1:$(PORT)
-LOCAL_OIDC_ISSUER = http://127.0.0.1:$(IDP_PORT)
+BACKEND_PORT ?= 8000
+FRONTEND_PORT ?= 3000
+IDP_PORT ?= 8001
+DEV_HOST ?= 127.0.0.1
+BACKEND_URL = http://127.0.0.1:$(BACKEND_PORT)
+LOCAL_APP_URL = http://$(DEV_HOST):$(FRONTEND_PORT)
+LOCAL_OIDC_ISSUER = http://$(DEV_HOST):$(IDP_PORT)
 
-.PHONY: all
+.PHONY: frontend backend dev-idp dev devi preview previewi preview-frontend preview-backend preview-idp build build-frontend build-backend check e2e fmt
 MAKEFLAGS += -j
 
-otel:
-	@otel-tui
+frontend/node_modules/.modules.yaml: frontend/package.json frontend/pnpm-lock.yaml
+	@cd frontend && pnpm install --frozen-lockfile
 
-watch-local-app:
-	@set -o pipefail; \
-	PORT="$(PORT)" APP_URL="$(LOCAL_APP_URL)" \
-	OIDC_ISSUER="$(LOCAL_OIDC_ISSUER)" \
-	OIDC_CLIENT_ID="$(DEV_OIDC_CLIENT_ID)" \
-	OIDC_CLIENT_SECRET="$(DEV_OIDC_CLIENT_SECRET)" \
-	SESSION_ENCRYPTION_KEY="$(DEV_SESSION_ENCRYPTION_KEY)" \
-	ALLOW_INSECURE_OIDC=1 \
-	topcoat dev --bin food | cat
+frontend: frontend/node_modules/.modules.yaml
+	@cd frontend && VITE_HOST="$(DEV_HOST)" VITE_PORT="$(FRONTEND_PORT)" BACKEND_URL="$(BACKEND_URL)" pnpm run dev
 
-watch-idp:
-	@PORT="$(IDP_PORT)" APP_URL="$(LOCAL_APP_URL)" \
-	OIDC_ISSUER="$(LOCAL_OIDC_ISSUER)" \
-	OIDC_CLIENT_ID="$(DEV_OIDC_CLIENT_ID)" \
-	OIDC_CLIENT_SECRET="$(DEV_OIDC_CLIENT_SECRET)" \
-	cargo run --bin dev_idp
+backend:
+	@PORT="$(BACKEND_PORT)" cargo run --manifest-path backend/Cargo.toml --bin food-backend
 
-devi: watch-local-app watch-idp
-dev: watch-local-app
+dev-idp:
+	@HOST="$(DEV_HOST)" PORT="$(IDP_PORT)" cargo run --manifest-path backend/Cargo.toml --bin dev_idp
 
-build:
-	@topcoat asset bundle --bin food
-	@cargo build --bin dev_idp
+dev: frontend backend
 
-check:
-	@topcoat fmt
-	@cargo fmt --check
-	@cargo test --bins
-	@cargo clippy --bins -- -D warnings
-	@deno task check
+devi previewi: export APP_URL=$(LOCAL_APP_URL)
+devi previewi: export OIDC_ISSUER=$(LOCAL_OIDC_ISSUER)
+devi previewi: export OIDC_CLIENT_ID=$(DEV_OIDC_CLIENT_ID)
+devi previewi: export OIDC_CLIENT_SECRET=$(DEV_OIDC_CLIENT_SECRET)
+devi previewi: export SESSION_ENCRYPTION_KEY=$(DEV_SESSION_ENCRYPTION_KEY)
+devi previewi: export ALLOW_INSECURE_OIDC=1
+devi: frontend backend dev-idp
 
-e2e:
-	@deno task e2e
+preview: preview-frontend preview-backend
 
-fmt:
-	@topcoat fmt
-	@cargo fmt
-	@deno fmt
+previewi: preview-frontend preview-backend preview-idp
+
+preview-frontend: build
+	@cd frontend && VITE_HOST="$(DEV_HOST)" BACKEND_URL="$(BACKEND_URL)" pnpm run preview --port "$(FRONTEND_PORT)"
+
+preview-backend: build
+	@PORT="$(BACKEND_PORT)" cargo run --release --manifest-path backend/Cargo.toml --bin food-backend
+
+preview-idp: build
+	@HOST="$(DEV_HOST)" PORT="$(IDP_PORT)" cargo run --release --manifest-path backend/Cargo.toml --bin dev_idp
+
+build: build-frontend build-backend
+
+build-frontend: frontend/node_modules/.modules.yaml
+	@cd frontend && pnpm run build
+
+build-backend:
+	@cargo build --release --manifest-path backend/Cargo.toml --bins
+
+check: frontend/node_modules/.modules.yaml
+	@cargo fmt --manifest-path backend/Cargo.toml --check
+	@cargo test --manifest-path backend/Cargo.toml --bins --features import-tools
+	@cargo clippy --manifest-path backend/Cargo.toml --bins --features import-tools -- -D warnings
+	@cd frontend && pnpm run fmt:check && pnpm run lint && pnpm run typecheck
+
+# Each Playwright test gets a new database on the dev-shell PostgreSQL server.
+e2e: frontend/node_modules/.modules.yaml
+	@cd frontend && pnpm run e2e
+
+fmt: frontend/node_modules/.modules.yaml
+	@cargo fmt --manifest-path backend/Cargo.toml
+	@cd frontend && pnpm run fmt

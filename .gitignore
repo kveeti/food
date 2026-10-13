@@ -1,9 +1,6 @@
 .env
 .pg/
-target/
-
+backend/target/
+frontend/node_modules/
+frontend/dist/
 .DS_Store
-node_modules/
-
-playwright-report/
-test-results/

@@ -4,7 +4,7 @@
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 
   outputs =
-    { nixpkgs, ... }:
+    { self, nixpkgs, ... }:
     let
       systems = [
         "x86_64-linux"
@@ -13,14 +13,71 @@
         "aarch64-darwin"
       ];
       forAllSystems = f: nixpkgs.lib.genAttrs systems (system: f nixpkgs.legacyPackages.${system});
+      mkPackages =
+        system:
+        let
+          pkgs = nixpkgs.legacyPackages.${system};
+
+          backend = pkgs.rustPlatform.buildRustPackage {
+            pname = "food-backend";
+            version = "0.1.0";
+            src = ./backend;
+            cargoLock.lockFile = ./backend/Cargo.lock;
+            cargoBuildFlags = [
+              "--bin"
+              "food-backend"
+            ];
+            checkFlags = [ "--skip=data::" ];
+          };
+
+          frontend = pkgs.stdenvNoCC.mkDerivation (finalAttrs: {
+            pname = "food-frontend";
+            version = "0.1.0";
+            src = ./frontend;
+
+            pnpmDeps = pkgs.fetchPnpmDeps {
+              inherit (finalAttrs) pname version src;
+              pnpm = pkgs.pnpm_10;
+              fetcherVersion = 4;
+              hash = "sha256-UzCZT1ZraSusfkKi0yzUZhGILSsLO+P2AIgJ5xFtHV8=";
+            };
+
+            nativeBuildInputs = [
+              pkgs.nodejs_24
+              pkgs.pnpm_10
+              pkgs.pnpmConfigHook
+            ];
+
+            buildPhase = ''
+              runHook preBuild
+              pnpm run build
+              runHook postBuild
+            '';
+
+            installPhase = ''
+              runHook preInstall
+              mkdir -p "$out"
+              cp -r dist/. "$out/"
+              runHook postInstall
+            '';
+          });
+        in
+        {
+          inherit backend frontend;
+          default = backend;
+        };
     in
     {
+      packages = nixpkgs.lib.genAttrs systems mkPackages;
+      nixosModules.nginx = import ./nix/nginx.nix { inherit self; };
+
       devShells = forAllSystems (pkgs: {
         default = pkgs.mkShell {
           packages = [
             pkgs.playwright-driver.browsers
             pkgs.postgresql_18
-            pkgs.deno
+            pkgs.nodejs_24
+            pkgs.pnpm_10
             pkgs.rustc
             pkgs.cargo
             pkgs.rustfmt
