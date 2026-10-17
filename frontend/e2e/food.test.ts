@@ -310,131 +310,6 @@ test("searches, loads a skeleton, and logs and deletes food with keyboard", asyn
   const entries = foodSection.getByRole("list", { name: "Breakfast foods" });
   await expect(entries).toContainText("150.5 g");
   await expect(entries).toContainText("75 kcal");
-  const mealHeading = page
-    .getByRole("heading", { name: "Breakfast", exact: true })
-    .getByText("Breakfast", { exact: true });
-  const mealHeader = foodSection
-    .getByRole("article", { name: "Breakfast", exact: true })
-    .locator("header");
-  const foodName = entries.getByText("Apple", { exact: true });
-  const foodRow = entries
-    .getByRole("button", { name: "Edit Apple entry" })
-    .locator("../..");
-  const [
-    foodSectionBox,
-    mealHeaderBox,
-    mealHeadingBox,
-    foodNameBox,
-    foodRowBox,
-  ] = await Promise.all([
-    foodSection.boundingBox(),
-    mealHeader.boundingBox(),
-    mealHeading.boundingBox(),
-    foodName.boundingBox(),
-    foodRow.boundingBox(),
-  ]);
-  expect(foodSectionBox).not.toBeNull();
-  expect(mealHeaderBox).not.toBeNull();
-  expect(mealHeadingBox).not.toBeNull();
-  expect(foodNameBox).not.toBeNull();
-  expect(foodRowBox).not.toBeNull();
-  expect(mealHeaderBox!.x).toBeCloseTo(foodSectionBox!.x, 0);
-  expect(mealHeaderBox!.width).toBeCloseTo(foodSectionBox!.width, 0);
-  expect(foodRowBox!.x).toBeGreaterThan(mealHeaderBox!.x);
-  expect(mealHeadingBox!.x).toBeCloseTo(foodNameBox!.x, 0);
-
-  await page.setViewportSize({ width: 900, height: 900 });
-  const aligned = [
-    page.locator(".goal-card").first(),
-    page.locator(".nutrient-total").first(),
-    page.getByRole("combobox", { name: "Search foods" }),
-  ];
-  const wideMealHeadingBox = await mealHeading.boundingBox();
-  const wideMealHeaderBox = await mealHeader.boundingBox();
-  const wideSearchBox = await page
-    .getByRole("combobox", { name: "Search foods" })
-    .boundingBox();
-  expect(wideMealHeadingBox).not.toBeNull();
-  expect(wideMealHeaderBox).not.toBeNull();
-  expect(wideSearchBox).not.toBeNull();
-  expect(
-    wideMealHeaderBox!.y - (wideSearchBox!.y + wideSearchBox!.height),
-  ).toBeGreaterThanOrEqual(12);
-  for (const element of aligned) {
-    const box = await element.boundingBox();
-    expect(box).not.toBeNull();
-    expect(box!.x).toBeCloseTo(wideMealHeadingBox!.x, 0);
-  }
-  const dayNavigationStart = await page
-    .locator("[data-day-navigation-content]")
-    .evaluate((element) => {
-      const box = element.getBoundingClientRect();
-      const styles = getComputedStyle(element);
-      return box.x + Number.parseFloat(styles.paddingInlineStart);
-    });
-  expect(dayNavigationStart).toBeCloseTo(wideMealHeadingBox!.x, 0);
-
-  await page.setViewportSize({ width: 900, height: 300 });
-  await page
-    .locator("main")
-    .evaluate((element) => element.scrollTo(0, element.scrollHeight));
-  const stickyMealHeaderBox = await mealHeader.boundingBox();
-  const stickySearchBox = await page
-    .getByRole("combobox", { name: "Search foods" })
-    .boundingBox();
-  expect(stickyMealHeaderBox).not.toBeNull();
-  expect(stickySearchBox).not.toBeNull();
-  expect(
-    stickyMealHeaderBox!.y - (stickySearchBox!.y + stickySearchBox!.height),
-  ).toBeGreaterThanOrEqual(12);
-
-  await page.setViewportSize({ width: 1280, height: 900 });
-  const narrowSidebarCards = await page.locator(".goal-card").all();
-  const narrowCalorieBox = await narrowSidebarCards[0].boundingBox();
-  const narrowWaterBox = await narrowSidebarCards[1].boundingBox();
-  expect(narrowCalorieBox).not.toBeNull();
-  expect(narrowWaterBox).not.toBeNull();
-  expect(narrowWaterBox!.y).toBeGreaterThan(
-    narrowCalorieBox!.y + narrowCalorieBox!.height,
-  );
-
-  await page.setViewportSize({ width: 1400, height: 900 });
-  const desktopMealHeadingBox = await mealHeading.boundingBox();
-  const desktopMealHeaderBox = await mealHeader.boundingBox();
-  const desktopSearchBox = await page
-    .getByRole("combobox", { name: "Search foods" })
-    .boundingBox();
-  const desktopGoalBox = await page.locator(".goal-card").first().boundingBox();
-  const desktopNutrientBox = await page
-    .locator(".nutrient-total")
-    .first()
-    .boundingBox();
-  expect(desktopMealHeadingBox).not.toBeNull();
-  expect(desktopMealHeaderBox).not.toBeNull();
-  expect(desktopSearchBox).not.toBeNull();
-  expect(desktopGoalBox).not.toBeNull();
-  expect(desktopNutrientBox).not.toBeNull();
-  expect(
-    desktopMealHeaderBox!.y - (desktopSearchBox!.y + desktopSearchBox!.height),
-  ).toBeGreaterThanOrEqual(12);
-  expect(desktopGoalBox!.x + desktopGoalBox!.width).toBeLessThan(
-    desktopMealHeadingBox!.x,
-  );
-  expect(desktopNutrientBox!.x).toBeCloseTo(desktopGoalBox!.x, 0);
-  for (const element of aligned.slice(2)) {
-    const box = await element.boundingBox();
-    expect(box).not.toBeNull();
-    expect(box!.x).toBeCloseTo(desktopMealHeadingBox!.x, 0);
-  }
-
-  await page.setViewportSize({ width: 1600, height: 900 });
-  const wideCalorieBox = await page.locator(".goal-card").first().boundingBox();
-  const wideWaterBox = await page.locator(".goal-card").nth(1).boundingBox();
-  expect(wideCalorieBox).not.toBeNull();
-  expect(wideWaterBox).not.toBeNull();
-  expect(wideWaterBox!.y).toBeCloseTo(wideCalorieBox!.y, 0);
-
-  await page.setViewportSize({ width: 390, height: 844 });
   await page.reload();
   await expect(entries).toContainText("Apple");
   await expect(entries).toContainText("75 kcal");
@@ -635,21 +510,9 @@ test("continues meals and edits, cancels, retries and deletes inline", async ({
   );
   await foods.getByRole("button", { name: "Delete Apple juice entry" }).click();
   await expect(page.getByText("No meals logged for this day")).toBeVisible();
-  await expect
-    .poll(() =>
-      lastMeal.evaluate((element) => element.getBoundingClientRect().height),
-    )
-    .toBe(0);
-  const empty = page.getByText("No meals logged for this day");
-  const pendingEmptyTop = await empty.evaluate(
-    (element) => element.getBoundingClientRect().top,
-  );
   releaseSuccessfulDelete();
   expect((await deleted).ok()).toBe(true);
   await expect(lastMeal).toHaveCount(0);
-  expect(
-    await empty.evaluate((element) => element.getBoundingClientRect().top),
-  ).toBe(pendingEmptyTop);
   await expect(foods).toHaveCount(0);
   await page.reload();
   await expect(page.getByText("No meals logged for this day")).toBeVisible();

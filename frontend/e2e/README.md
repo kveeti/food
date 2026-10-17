@@ -1,45 +1,16 @@
-# End-to-end tests
+# Browser tests
 
-These tests exercise user journeys through the running React app, Rust API,
-authentication flow, and PostgreSQL database. Use accessible browser controls
-and assert user-visible outcomes. Reload or return to a day to verify that a
-change persisted.
+Test how people use the app: find food, log a meal, change an entry, or save a
+goal. Keep tests easy to follow. A test can be long when its steps belong
+together, such as adding, editing, and deleting a meal. Split it when it starts
+testing unrelated things, not just because it has many lines.
 
-Do not assert CSS classes, computed styles, layout dimensions, animation details,
-or DOM node identity. Test behavior, not how the UI implements it.
+- Use the browser and check what the user sees and can do.
+- Reload the page to check that a change was saved.
+- Use the real backend. Fake slow or failed requests only to test those cases.
+- Wait for results instead of sleeping for a set time.
+- Check that the app works, not exact spacing, fonts, colors, CSS or DOM structure.
+- Keep SQL and database checks in backend tests.
 
-E2E tests must not contain SQL, inspect database tables, import backend data
-modules, or depend on how the backend stores a feature. Public HTTP requests
-may coordinate requests or set up a scenario when there is an appropriate
-public API, but the journey under test should use the UI. Database constraints,
-snapshot internals, and data-access rules belong in backend integration tests.
-
-The test harness owns process and database isolation. Each test gets a fresh
-database and a backend; workers have independent frontend and dev sign-in
-servers. Database creation and removal are infrastructure, not test assertions.
-The harness invokes the backend-owned `seed-test-catalog` command for a small
-known catalog. Its schema knowledge and SQL stay under `backend/test-support`.
-Tests may rely on the fixture foods' visible names and nutrition, not their
-database IDs. Do not move SQL into a frontend helper to hide it from a test.
-
-Use real responses for successful flows. Network interception is appropriate
-for controlled latency or a specific failure, such as holding the detail
-response to observe a skeleton or rejecting one save to exercise rollback.
-Release delayed requests explicitly; avoid fixed sleeps and mocked happy paths.
-Verify retry and persistence against the real backend afterward.
-
-Run `pnpm run e2e` from `frontend` in the Nix development shell, or `make e2e`
-from `new`. The harness builds the backend with the `test-support` feature;
-the seed command is excluded from normal builds and only accepts disposable
-E2E databases. Run one file with `pnpm run e2e food.test.ts`.
-
-Use `pnpm run e2e:preview` to build the frontend and run the same tests against
-Vite preview instead of the dev server. Run the sign-in production checks with:
-
-```sh
-pnpm run e2e:preview prerender.test.ts
-```
-
-These checks cover sign-in without JavaScript, hydration, login/logout, and
-connection-aware preloading. They also check that the browser never requests
-the build-only renderer. The normal dev test run skips these checks.
+Each test must have its own backend and database. The setup here handles that,
+loads sample foods from `backend/test-support/`, and cleans up afterward.

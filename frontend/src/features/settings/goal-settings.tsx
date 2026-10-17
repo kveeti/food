@@ -85,13 +85,13 @@ export function GoalSettings(props: {
           onChange={(event) => setStartsOn(event.currentTarget.value)}
         />
       </Field>
-      {goals.isPending && <GoalSettingsSkeleton />}
+      {!goals.isFetchedAfterMount && <GoalSettingsSkeleton />}
       {goals.isError && (
         <p role="alert" className="mt-4 text-danger-fg">
           Error loading goals.
         </p>
       )}
-      {goals.data && (
+      {goals.isFetchedAfterMount && goals.data && (
         <GoalForm
           key={startsOn}
           startsOn={startsOn}
